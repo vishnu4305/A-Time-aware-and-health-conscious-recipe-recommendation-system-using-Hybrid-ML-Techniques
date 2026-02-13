@@ -1,0 +1,48 @@
+# Python virtual environment
+venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Flask
+instance/
+.webassets-cache
+
+# Environment variables
+# .env  # Uncomment if you want to commit .env for development
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Dataset files
+data/RAW_recipes.csv
+data/RAW_interactions.csv
+data/processed/
+
+# ML Models cache
+ml_models/embeddings/
+
+# SQLite database (optional - remove this line if you want to share the database file)
+food_db.sqlite
+
+# Node modules
+frontend/node_modules/
+frontend/build/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+data/PP_recipes.csv
+data/PP_users.csv
+git

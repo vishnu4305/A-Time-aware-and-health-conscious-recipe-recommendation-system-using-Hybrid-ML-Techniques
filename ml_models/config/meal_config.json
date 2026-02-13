@@ -1,0 +1,64 @@
+{
+  "breakfast": {
+    "keywords": [
+      "breakfast", "pancake", "waffle", "oatmeal", "cereal", "egg", "toast", 
+      "muffin", "smoothie", "yogurt", "bagel", "croissant", "granola", 
+      "french toast", "omelette", "scrambled", "poached", "boiled egg"
+    ],
+    "ingredients": [
+      "egg", "milk", "cereal", "oats", "bacon", "syrup", "coffee", "butter",
+      "cream", "yogurt", "honey", "granola", "fruit"
+    ],
+    "calorie_range": [200, 500],
+    "macro_profile": {
+      "carbs_min": 40,
+      "protein_min": 10
+    }
+  },
+  "lunch": {
+    "keywords": [
+      "sandwich", "salad", "soup", "wrap", "burger", "pasta", "lunch",
+      "club sandwich", "grilled", "tuna", "chicken salad", "caesar",
+      "panini", "sub", "hoagie"
+    ],
+    "ingredients": [
+      "lettuce", "bread", "chicken", "turkey", "tuna", "cheese", "tomato",
+      "mayo", "mustard", "pickle", "onion", "avocado"
+    ],
+    "calorie_range": [400, 700],
+    "macro_profile": {
+      "protein_min": 20,
+      "carbs_max": 60
+    }
+  },
+  "snacks": {
+    "keywords": [
+      "snack", "dip", "chip", "cookie", "bar", "bite", "appetizer",
+      "finger food", "crackers", "popcorn", "trail mix", "energy bar",
+      "protein bar", "fruit cup"
+    ],
+    "ingredients": [
+      "nuts", "cheese", "crackers", "fruit", "chocolate", "peanut butter",
+      "hummus", "vegetables", "carrots", "celery"
+    ],
+    "calorie_range": [100, 300],
+    "macro_profile": {
+      "calories_max": 300
+    }
+  },
+  "dinner": {
+    "keywords": [
+      "dinner", "roast", "steak", "casserole", "curry", "stew", "baked",
+      "grilled", "braised", "pot roast", "chicken breast", "fish fillet",
+      "pork chop", "lasagna", "enchilada", "risotto"
+    ],
+    "ingredients": [
+      "beef", "pork", "lamb", "rice", "potato", "salmon", "cod", "shrimp",
+      "vegetables", "broccoli", "carrots", "green beans"
+    ],
+    "calorie_range": [500, 900],
+    "macro_profile": {
+      "protein_min": 25
+    }
+  }
+}
