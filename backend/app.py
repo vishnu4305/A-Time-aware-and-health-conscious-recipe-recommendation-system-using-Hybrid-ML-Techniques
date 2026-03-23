@@ -42,8 +42,8 @@ def initialize_and_fix_db():
             cursor.execute("PRAGMA table_info(users)")
             columns = [info[1] for info in cursor.fetchall()]
             
-            if columns and 'username' not in columns:
-                print("Missing username column! Fixing users table...")
+            if columns and ('username' not in columns or 'gender' not in columns):
+                print("Missing username or gender column! Fixing users table...")
                 cursor.execute("DROP TABLE IF EXISTS users")
                 with open(schema_path, 'r') as f:
                     conn.executescript(f.read())
