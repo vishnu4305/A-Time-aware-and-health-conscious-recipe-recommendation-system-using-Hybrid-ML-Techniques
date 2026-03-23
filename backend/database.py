@@ -70,10 +70,10 @@ def execute_query(query, params=None, fetch=False, fetch_one=False):
         return None
 
 
-def get_user_by_name(name):
-    """Get user by name"""
-    query = "SELECT * FROM users WHERE name = ?"
-    return execute_query(query, (name,), fetch=True, fetch_one=True)
+def get_user_by_username(username):
+    """Get user by username"""
+    query = "SELECT * FROM users WHERE username = ?"
+    return execute_query(query, (username,), fetch=True, fetch_one=True)
 
 
 def get_user_by_id(user_id):
@@ -82,15 +82,15 @@ def get_user_by_id(user_id):
     return execute_query(query, (user_id,), fetch=True, fetch_one=True)
 
 
-def create_user(name, age, height, weight, gender, conditions, activity_level=1.2):
+def create_user(username, name, age, height, weight, gender, conditions, activity_level=1.2):
     """Create a new user"""
     import json
     query = """
-        INSERT INTO users (name, age, height, weight, gender, activity_level, conditions)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO users (username, name, age, height, weight, gender, activity_level, conditions)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """
     conditions_json = json.dumps(conditions) if conditions else json.dumps([])
-    result = execute_query(query, (name, age, height, weight, gender, activity_level, conditions_json))
+    result = execute_query(query, (username, name, age, height, weight, gender, activity_level, conditions_json))
     return result['last_id'] if result else None
 
 

@@ -6,6 +6,7 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 function UserProfile({ onUserCreated }) {
   const [formData, setFormData] = useState({
+    username: '',
     name: '',
     age: '',
     height: '',
@@ -41,15 +42,15 @@ function UserProfile({ onUserCreated }) {
     setLoading(true);
 
     // Validation
-    if (!formData.name || !formData.age || !formData.height || !formData.weight) {
+    if (!formData.username || !formData.name || !formData.age || !formData.height || !formData.weight) {
       setError('Please fill in all required fields');
       setLoading(false);
       return;
     }
 
     try {
-      // Check if user exists by name
-      const checkResponse = await axios.get(`${API_URL}/user/by-name/${formData.name}`);
+      // Check if user exists by username
+      const checkResponse = await axios.get(`${API_URL}/user/by-username/${formData.username}`);
       
       if (checkResponse.data) {
         // User exists, load their profile
@@ -64,6 +65,7 @@ function UserProfile({ onUserCreated }) {
     try {
       // Create new user
       const response = await axios.post(`${API_URL}/user/create`, {
+        username: formData.username,
         name: formData.name,
         age: parseInt(formData.age),
         height: parseFloat(formData.height),
@@ -97,18 +99,30 @@ function UserProfile({ onUserCreated }) {
 
             <Form onSubmit={handleSubmit}>
               <Form.Group className="mb-3">
+                <Form.Label>Username *</Form.Label>
+                <Form.Control
+                  type="text"
+                  name="username"
+                  value={formData.username}
+                  onChange={handleChange}
+                  placeholder="Choose a unique username"
+                  required
+                />
+                <Form.Text className="text-muted">
+                  If you've used this app before, enter your previous username to load your profile
+                </Form.Text>
+              </Form.Group>
+
+              <Form.Group className="mb-3">
                 <Form.Label>Name *</Form.Label>
                 <Form.Control
                   type="text"
                   name="name"
                   value={formData.name}
                   onChange={handleChange}
-                  placeholder="Enter your name "
+                  placeholder="Enter your full name"
                   required
                 />
-                <Form.Text className="text-muted">
-                  If you've used this app before, enter your previous name to load your profile
-                </Form.Text>
               </Form.Group>
 
               <Row>

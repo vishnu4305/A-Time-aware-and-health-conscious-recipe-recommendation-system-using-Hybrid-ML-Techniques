@@ -4,10 +4,12 @@
 -- Users table: stores user profiles and health conditions
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL,
     age INTEGER NOT NULL,
     height REAL NOT NULL,  -- in cm
     weight REAL NOT NULL,  -- in kg
+    gender TEXT,
     activity_level REAL DEFAULT 1.2,  -- 1.2=sedentary, 1.55=moderate, 1.9=active
     conditions TEXT,  -- JSON string e.g., ["obesity", "diabetes"]
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

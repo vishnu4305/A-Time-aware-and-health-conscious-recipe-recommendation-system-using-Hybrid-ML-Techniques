@@ -26,10 +26,12 @@ else:
 # Test creating a user
 print("\n2. Testing user creation...")
 user_id = db.create_user(
+    username="testuser123",
     name="Test User",
     age=25,
     height=170,
     weight=70,
+    gender="male",
     conditions=["diabetes"],
     activity_level=1.55
 )

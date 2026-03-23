@@ -39,6 +39,7 @@ def create_user():
     
     Request JSON:
     {
+        "username": "vishnu123",
         "name": "Vishnu",
         "age": 25,
         "height": 169,
@@ -49,6 +50,7 @@ def create_user():
     """
     try:
         data = request.json
+        username = data.get('username')
         name = data.get('name')
         age = data.get('age')
         height = data.get('height')
@@ -58,20 +60,16 @@ def create_user():
         conditions = data.get('conditions', [])
         
         # Validate required fields
-        if not all([name, age, height, weight]):
+        if not all([username, name, age, height, weight]):
             return jsonify({'error': 'Missing required fields'}), 400
         
         # Check if user already exists
-        existing_user = db.get_user_by_name(name)
+        existing_user = db.get_user_by_username(username)
         if existing_user:
-            return jsonify({
-                'message': 'User already exists',
-                'user_id': existing_user['id'],
-                'user': existing_user
-            }), 200
+            return jsonify({'error': 'Username already exists. Please choose another one.'}), 409
         
         # Create new user
-        user_id = db.create_user(name, age, height, weight, gender, conditions, activity_level)
+        user_id = db.create_user(username, name, age, height, weight, gender, conditions, activity_level)
         
         if user_id:
             user = db.get_user_by_id(user_id)
@@ -102,13 +100,13 @@ def get_user(user_id):
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/user/by-name/<name>', methods=['GET'])
-def get_user_by_name(name):
+@app.route('/user/by-username/<username>', methods=['GET'])
+def get_user_by_username(username):
     """
-    Get user profile by name
+    Get user profile by username
     """
     try:
-        user = db.get_user_by_name(name)
+        user = db.get_user_by_username(username)
         if user:
             return jsonify(user), 200
         else:
