@@ -380,6 +380,28 @@ def health_check():
     }), 200
 
 
+# ==================== Diagnostic Route ====================
+
+@app.route('/debug/db', methods=['GET'])
+def debug_db():
+    """Endpoint to check live database schema on Render"""
+    try:
+        conn = db.get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(users)")
+        columns = [info[1] for info in cursor.fetchall()]
+        
+        schema_path = os.path.join(os.path.dirname(__file__), '..', 'database.sql')
+        
+        return jsonify({
+            "users_table_columns": columns,
+            "schema_file_found": os.path.exists(schema_path),
+            "db_path": os.getenv('DATABASE_PATH', os.path.join(os.path.dirname(__file__), '..', 'food_db.sqlite'))
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # ==================== Main ====================
 
 if __name__ == '__main__':
