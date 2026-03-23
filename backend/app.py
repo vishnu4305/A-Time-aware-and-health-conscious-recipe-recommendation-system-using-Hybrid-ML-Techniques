@@ -24,6 +24,37 @@ CORS(app)  # Enable CORS for frontend communication
 
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key')
 
+# ==================== Database Setup & Fix ====================
+def initialize_and_fix_db():
+    print("Checking database schema...")
+    conn = db.get_db_connection()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            
+            # 1. Run database.sql to ensure all tables exist
+            schema_path = os.path.join(os.path.dirname(__file__), '..', 'database.sql')
+            if os.path.exists(schema_path):
+                with open(schema_path, 'r') as f:
+                    conn.executescript(f.read())
+            
+            # 2. Check if the username column exists in users table
+            cursor.execute("PRAGMA table_info(users)")
+            columns = [info[1] for info in cursor.fetchall()]
+            
+            if columns and 'username' not in columns:
+                print("Missing username column! Fixing users table...")
+                cursor.execute("DROP TABLE IF EXISTS users")
+                with open(schema_path, 'r') as f:
+                    conn.executescript(f.read())
+                print("Users table fixed!")
+        except Exception as e:
+            print(f"Database setup error: {e}")
+        finally:
+            conn.close()
+
+initialize_and_fix_db()
+
 # Load data at startup
 print("Loading recipe and ratings data...")
 load_data()
