@@ -94,6 +94,18 @@ def create_user(username, name, age, height, weight, gender, conditions, activit
     return result['last_id'] if result else None
 
 
+def update_user(user_id, name, age, height, weight, gender, conditions, activity_level=1.2):
+    """Update an existing user"""
+    import json
+    query = """
+        UPDATE users 
+        SET name = ?, age = ?, height = ?, weight = ?, gender = ?, activity_level = ?, conditions = ?
+        WHERE id = ?
+    """
+    conditions_json = json.dumps(conditions) if conditions else json.dumps([])
+    return execute_query(query, (name, age, height, weight, gender, activity_level, conditions_json, user_id))
+
+
 def get_all_recipes():
     """Get all recipes"""
     query = "SELECT * FROM recipes"

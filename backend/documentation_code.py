@@ -170,6 +170,17 @@ def create_user(username, name, age, height, weight, gender, conditions, activit
     return result['last_id'] if result else None
 
 
+def update_user(user_id, name, age, height, weight, gender, conditions, activity_level=1.2):
+    """Update an existing user"""
+    query = """
+        UPDATE users 
+        SET name = ?, age = ?, height = ?, weight = ?, gender = ?, activity_level = ?, conditions = ?
+        WHERE id = ?
+    """
+    conditions_json = json.dumps(conditions) if conditions else json.dumps([])
+    return execute_query(query, (name, age, height, weight, gender, activity_level, conditions_json, user_id))
+
+
 def get_all_recipes():
     """Get all recipes"""
     query = "SELECT * FROM recipes"
@@ -321,6 +332,24 @@ def get_user_route(user_id):
 def get_user_by_username_route(username):
     user = get_user_by_username(username)
     return (jsonify(user), 200) if user else (jsonify({'error': 'User not found'}), 404)
+
+
+@app.route('/user/update/<int:user_id>', methods=['PUT'])
+def update_user_route_doc(user_id):
+    try:
+        data = request.json
+        if not all(k in data for k in ['name', 'age', 'height', 'weight']):
+            return jsonify({'error': 'Missing required fields'}), 400
+            
+        update_user(
+            user_id=user_id, name=data['name'], age=data['age'], height=data['height'], weight=data['weight'],
+            gender=data.get('gender', 'male'), conditions=data.get('conditions', []),
+            activity_level=data.get('activity_level', 1.2)
+        )
+        user = get_user_by_id(user_id)
+        return jsonify({'message': 'User updated successfully', 'user': user}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # --- Recipe Routes ---
 @app.route('/recipes', methods=['GET'])

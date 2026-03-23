@@ -146,6 +146,35 @@ def get_user_by_username(username):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/user/update/<int:user_id>', methods=['PUT'])
+def update_user_profile(user_id):
+    """
+    Update an existing user profile
+    """
+    try:
+        data = request.json
+        name = data.get('name')
+        age = data.get('age')
+        height = data.get('height')
+        weight = data.get('weight')
+        gender = data.get('gender', 'male')
+        activity_level = data.get('activity_level', 1.2)
+        conditions = data.get('conditions', [])
+        
+        if not all([name, age, height, weight]):
+            return jsonify({'error': 'Missing required fields'}), 400
+        
+        db.update_user(user_id, name, age, height, weight, gender, conditions, activity_level)
+        user = db.get_user_by_id(user_id)
+        
+        return jsonify({
+            'message': 'User updated successfully',
+            'user': user
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 # ==================== Recipe Routes ====================
 
 @app.route('/recipes', methods=['GET'])

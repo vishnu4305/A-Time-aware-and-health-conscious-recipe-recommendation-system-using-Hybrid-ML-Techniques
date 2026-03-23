@@ -53,8 +53,17 @@ function UserProfile({ onUserCreated }) {
       const checkResponse = await axios.get(`${API_URL}/user/by-username/${formData.username}`);
       
       if (checkResponse.data) {
-        // User exists, load their profile
-        onUserCreated(checkResponse.data);
+        // User exists, update their profile with the new form data
+        const updateResponse = await axios.put(`${API_URL}/user/update/${checkResponse.data.id}`, {
+          name: formData.name,
+          age: parseInt(formData.age),
+          height: parseFloat(formData.height),
+          weight: parseFloat(formData.weight),
+          gender: formData.gender,
+          activity_level: parseFloat(formData.activity_level),
+          conditions: formData.conditions
+        });
+        onUserCreated(updateResponse.data.user);
         setLoading(false);
         return;
       }
