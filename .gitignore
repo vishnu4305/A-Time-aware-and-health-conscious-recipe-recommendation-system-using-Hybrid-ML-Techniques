@@ -31,8 +31,7 @@ data/processed/
 ml_models/embeddings/
 
 # SQLite database (optional - remove this line if you want to share the database file)
-food_db.sqlite
-
+# food_db.sqlite
 # Node modules
 frontend/node_modules/
 frontend/build/
