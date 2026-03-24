@@ -48,7 +48,7 @@ function Dashboard({ user }) {
           top_n: 12
         });
 
-        setRecommendations(response.data.recommendations);
+        setRecommendations(response.data.recommendations || []);
         setMealPlan(null);
       }
     } catch (err) {
@@ -218,7 +218,7 @@ function Dashboard({ user }) {
       )}
 
       {/* Normal Recommendations View */}
-      {viewMode === 'normal' && recommendations.length > 0 && (
+      {viewMode === 'normal' && recommendations && recommendations.length > 0 && (
         <div>
           <h4 className="mb-3" style={{color: '#0891b2', fontWeight: '700'}}>
             🍴 Your Recommendations ({recommendations.length})
@@ -236,7 +236,7 @@ function Dashboard({ user }) {
       )}
 
       {/* Empty State */}
-      {!loading && recommendations.length === 0 && !mealPlan && !error && (
+      {!loading && (!recommendations || recommendations.length === 0) && !mealPlan && !error && (
         <Card className="text-center">
           <Card.Body className="py-5">
             <h5 className="text-muted">No recommendations yet</h5>
