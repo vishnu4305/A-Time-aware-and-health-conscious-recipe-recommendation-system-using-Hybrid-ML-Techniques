@@ -34,8 +34,8 @@ def initialize_and_fix_db():
     if not os.path.exists(db_path) or os.path.getsize(db_path) < 10000000:  # < 10MB
         print("Database is missing or is an LFS pointer. Downloading from Google Drive...")
         try:
-            # REPLACE THE ID BELOW WITH YOUR GOOGLE DRIVE FILE ID
-            file_id = "YOUR_FILE_ID_HERE"
+            # Replace the text inside the quotes with your actual Google Drive ID
+            file_id = "11CTtr2meMtGyOJKaCgbdA1YJY5nb7EhV" 
             url = f"https://drive.google.com/uc?id={file_id}"
             
             subprocess.check_call([sys.executable, "-m", "pip", "install", "gdown"])
