@@ -106,9 +106,11 @@ def update_user(user_id, name, age, height, weight, gender, conditions, activity
     return execute_query(query, (name, age, height, weight, gender, activity_level, conditions_json, user_id))
 
 
-def get_all_recipes():
+def get_all_recipes(limit=None):
     """Get all recipes"""
     query = "SELECT * FROM recipes"
+    if limit:
+        query += f" LIMIT {limit}"
     return execute_query(query, fetch=True)
 
 
@@ -118,9 +120,11 @@ def get_recipe_by_id(recipe_id):
     return execute_query(query, (recipe_id,), fetch=True, fetch_one=True)
 
 
-def get_all_ratings():
+def get_all_ratings(limit=None):
     """Get all ratings"""
     query = "SELECT * FROM ratings"
+    if limit:
+        query += f" LIMIT {limit}"
     return execute_query(query, fetch=True)
 
 

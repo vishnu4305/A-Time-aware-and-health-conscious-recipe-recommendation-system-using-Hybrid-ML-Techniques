@@ -201,11 +201,8 @@ def get_recipes():
     Get all recipes (with optional limit)
     """
     try:
-        limit = request.args.get('limit', type=int)
-        recipes = db.get_all_recipes()
-        
-        if limit and recipes:
-            recipes = recipes[:limit]
+        limit = request.args.get('limit', default=50, type=int)
+        recipes = db.get_all_recipes(limit=limit)
         
         return jsonify(recipes), 200
     except Exception as e:
@@ -268,6 +265,13 @@ def recommend():
         
         # Get recommendations
         recommendations = get_recommendations(user_id, gamma, lambda_decay, top_n)
+        
+        # COLD START FALLBACK: If ML model returns empty (for new users), pull real recipes from the downloaded DB
+        if not recommendations or len(recommendations) == 0:
+            print("ML Model returned 0 recipes (Cold Start). Pulling real recipes from DB directly...")
+            fallback_recs = db.execute_query("SELECT * FROM recipes WHERE ingredients IS NOT NULL LIMIT ?", (top_n,), fetch=True)
+            if fallback_recs:
+                recommendations = fallback_recs
 
         return jsonify({
             'user_id': user_id,
@@ -323,6 +327,15 @@ def recommend_meal_plan():
         # Get meal plan recommendations
         meal_plan = get_meal_plan_recommendations(user_id, gamma, lambda_decay, recipes_per_meal)
         
+        # COLD START FALLBACK FOR MEAL PLAN:
+        if not meal_plan or all(not meals or len(meals) == 0 for meals in meal_plan.values()):
+            print("ML Model returned empty meal plan. Pulling real recipes from DB directly...")
+            meal_plan = {
+                "breakfast": db.execute_query("SELECT * FROM recipes LIMIT ?", (recipes_per_meal,), fetch=True) or [],
+                "lunch": db.execute_query("SELECT * FROM recipes LIMIT ? OFFSET 10", (recipes_per_meal,), fetch=True) or [],
+                "dinner": db.execute_query("SELECT * FROM recipes LIMIT ? OFFSET 20", (recipes_per_meal,), fetch=True) or [],
+                "snacks": db.execute_query("SELECT * FROM recipes LIMIT ? OFFSET 30", (recipes_per_meal,), fetch=True) or []
+            }
 
         return jsonify(meal_plan), 200
         
@@ -373,14 +386,12 @@ def rate_recipe():
         # Calculate month_index
         timestamp = datetime.now()
         # Get earliest rating timestamp to calculate month_index
-        all_ratings = db.get_all_ratings()
-        if all_ratings and len(all_ratings) > 0:
-            # Convert timestamp string to datetime if needed
-            min_timestamp = min(r['timestamp'] for r in all_ratings if r['timestamp'])
-            if isinstance(min_timestamp, str):
-                min_timestamp = datetime.fromisoformat(min_timestamp.replace('Z', '+00:00'))
-            years_diff = timestamp.year - min_timestamp.year
-            months_diff = timestamp.month - min_timestamp.month
+        min_ts_result = db.execute_query("SELECT MIN(timestamp) as min_ts FROM ratings", fetch=True, fetch_one=True)
+        if min_ts_result and min_ts_result.get('min_ts'):
+            min_timestamp_str = min_ts_result['min_ts']
+            min_dt = datetime.fromisoformat(min_timestamp_str.replace('Z', '+00:00'))
+            years_diff = timestamp.year - min_dt.year
+            months_diff = timestamp.month - min_dt.month
             month_index = (years_diff * 12) + months_diff + 1
         else:
             month_index = 1

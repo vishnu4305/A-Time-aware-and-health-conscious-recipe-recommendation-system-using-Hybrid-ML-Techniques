@@ -32,11 +32,11 @@ def load_data():
     global _recipes_df, _ratings_df, _embeddings, _max_month_index, _cached_rating_count
     
     # Load recipes
-    recipes = db.get_all_recipes()
+    recipes = db.get_all_recipes(limit=10000)
     _recipes_df = pd.DataFrame(recipes)
     
     # Load ratings
-    ratings = db.get_all_ratings()
+    ratings = db.get_all_ratings(limit=50000)
     _ratings_df = pd.DataFrame(ratings) if ratings else pd.DataFrame()
     
     # Filter out ratings for recipes that don't exist
@@ -85,7 +85,7 @@ def reload_ratings():
     
     # Count changed - reload ratings from database
     print(f"Ratings cache miss: {_cached_rating_count} -> {current_count} (reloading...)")
-    ratings = db.get_all_ratings()
+    ratings = db.get_all_ratings(limit=50000)
     _ratings_df = pd.DataFrame(ratings) if ratings else pd.DataFrame()
     
     # Filter out ratings for recipes that don't exist
