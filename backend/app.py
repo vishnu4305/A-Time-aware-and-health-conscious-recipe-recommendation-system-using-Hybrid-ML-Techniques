@@ -8,7 +8,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from datetime import datetime
 import os
-import subprocess
+import threading
 import sys
 from dotenv import load_dotenv
 
@@ -25,58 +25,16 @@ CORS(app)  # Enable CORS for frontend communication
 
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key')
 
-# ==================== Database Setup & Fix ====================
-def initialize_and_fix_db():
-    print("Checking database schema...")
-    
-    # Auto-download full database from Google Drive if missing or LFS pointer
-    db_path = os.path.join(os.path.dirname(__file__), '..', 'food_db.sqlite')
-    if not os.path.exists(db_path) or os.path.getsize(db_path) < 10000000:  # < 10MB
-        print("Database is missing or is an LFS pointer. Downloading from Google Drive...")
-        try:
-            # Replace the text inside the quotes with your actual Google Drive ID
-            file_id = "11CTtr2meMtGyOJKaCgbdA1YJY5nb7EhV" 
-            url = f"https://drive.google.com/uc?id={file_id}"
-            
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "gdown"])
-            import gdown
-            gdown.download(url, db_path, quiet=False)
-            print("Database downloaded successfully!")
-        except Exception as e:
-            print(f"Failed to download database: {e}")
-            
-    conn = db.get_db_connection()
-    if conn:
-        try:
-            cursor = conn.cursor()
-            
-            # 1. Run database.sql to ensure all tables exist
-            schema_path = os.path.join(os.path.dirname(__file__), '..', 'database.sql')
-            if os.path.exists(schema_path):
-                with open(schema_path, 'r') as f:
-                    conn.executescript(f.read())
-            
-            # 2. Check if the username column exists in users table
-            cursor.execute("PRAGMA table_info(users)")
-            columns = [info[1] for info in cursor.fetchall()]
-            
-            if columns and ('username' not in columns or 'gender' not in columns):
-                print("Missing username or gender column! Fixing users table...")
-                cursor.execute("DROP TABLE IF EXISTS users")
-                with open(schema_path, 'r') as f:
-                    conn.executescript(f.read())
-                print("Users table fixed!")
-        except Exception as e:
-            print(f"Database setup error: {e}")
-        finally:
-            conn.close()
+# Load ML data in the background to prevent Render deployment timeouts
+def background_load():
+    print("Background thread: Loading recipe and ML data...")
+    try:
+        load_data()
+        print("Background thread: ML Data loaded successfully!")
+    except Exception as e:
+        print(f"Background thread error: {e}")
 
-initialize_and_fix_db()
-
-# Load data at startup
-print("Loading recipe and ratings data...")
-load_data()
-print("Data loaded successfully!")
+threading.Thread(target=background_load, daemon=True).start()
 
 
 # ==================== User Routes ====================
@@ -269,7 +227,7 @@ def recommend():
         # COLD START FALLBACK: If ML model returns empty (for new users), pull real recipes from the downloaded DB
         if not recommendations or len(recommendations) == 0:
             print("ML Model returned 0 recipes (Cold Start). Pulling real recipes from DB directly...")
-            fallback_recs = db.execute_query("SELECT * FROM recipes WHERE ingredients IS NOT NULL LIMIT ?", (top_n,), fetch=True)
+            fallback_recs = db.get_random_recipes(top_n)
             if fallback_recs:
                 recommendations = fallback_recs
 
@@ -331,10 +289,10 @@ def recommend_meal_plan():
         if not meal_plan or all(not meals or len(meals) == 0 for meals in meal_plan.values()):
             print("ML Model returned empty meal plan. Pulling real recipes from DB directly...")
             meal_plan = {
-                "breakfast": db.execute_query("SELECT * FROM recipes LIMIT ?", (recipes_per_meal,), fetch=True) or [],
-                "lunch": db.execute_query("SELECT * FROM recipes LIMIT ? OFFSET 10", (recipes_per_meal,), fetch=True) or [],
-                "dinner": db.execute_query("SELECT * FROM recipes LIMIT ? OFFSET 20", (recipes_per_meal,), fetch=True) or [],
-                "snacks": db.execute_query("SELECT * FROM recipes LIMIT ? OFFSET 30", (recipes_per_meal,), fetch=True) or []
+                "breakfast": db.get_recipes_with_offset(0, recipes_per_meal) or [],
+                "lunch": db.get_recipes_with_offset(10, recipes_per_meal) or [],
+                "dinner": db.get_recipes_with_offset(20, recipes_per_meal) or [],
+                "snacks": db.get_recipes_with_offset(30, recipes_per_meal) or []
             }
 
         return jsonify(meal_plan), 200
@@ -386,9 +344,8 @@ def rate_recipe():
         # Calculate month_index
         timestamp = datetime.now()
         # Get earliest rating timestamp to calculate month_index
-        min_ts_result = db.execute_query("SELECT MIN(timestamp) as min_ts FROM ratings", fetch=True, fetch_one=True)
-        if min_ts_result and min_ts_result.get('min_ts'):
-            min_timestamp_str = min_ts_result['min_ts']
+        min_timestamp_str = db.get_earliest_rating_timestamp()
+        if min_timestamp_str:
             min_dt = datetime.fromisoformat(min_timestamp_str.replace('Z', '+00:00'))
             years_diff = timestamp.year - min_dt.year
             months_diff = timestamp.month - min_dt.month
@@ -443,19 +400,16 @@ def health_check():
 
 @app.route('/debug/db', methods=['GET'])
 def debug_db():
-    """Endpoint to check live database schema on Render"""
+    """Endpoint to check live database connection to MongoDB"""
     try:
-        conn = db.get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("PRAGMA table_info(users)")
-        columns = [info[1] for info in cursor.fetchall()]
-        
-        schema_path = os.path.join(os.path.dirname(__file__), '..', 'database.sql')
+        database = db.get_db()
+        recipe_count = database.recipes.count_documents({})
+        rating_count = database.ratings.count_documents({})
         
         return jsonify({
-            "users_table_columns": columns,
-            "schema_file_found": os.path.exists(schema_path),
-            "db_path": os.getenv('DATABASE_PATH', os.path.join(os.path.dirname(__file__), '..', 'food_db.sqlite'))
+            "status": "connected",
+            "recipe_count": recipe_count,
+            "rating_count": rating_count
         }), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500

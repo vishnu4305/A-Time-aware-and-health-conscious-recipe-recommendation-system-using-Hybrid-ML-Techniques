@@ -2,7 +2,7 @@
 Load processed data into SQLite database
 """
 import pandas as pd
-import sqlite3
+from pymongo import MongoClient
 import os
 import sys
 from dotenv import load_dotenv
@@ -12,24 +12,24 @@ backend_env = os.path.join(os.path.dirname(__file__), '..', 'backend', '.env')
 load_dotenv(backend_env)
 
 
-def get_db_connection():
-    """Create SQLite connection"""
+def get_db():
+    """Create MongoDB connection"""
     try:
-        # Get database path from .env or use default
-        db_path = os.getenv('DATABASE_PATH', os.path.join(os.path.dirname(__file__), '..', 'food_db.sqlite'))
+        # Temporarily hardcode the URI to guarantee it is read correctly
+        mongo_uri = "mongodb+srv://vishnu123:A.vishnu%40123@cluster0.1iu5btx.mongodb.net/?retryWrites=true&w=majority"
+        client = MongoClient(mongo_uri)
+        db = client['food_recommendation']
         
-        # Ensure parent directory exists
-        os.makedirs(os.path.dirname(db_path) if os.path.dirname(db_path) else '.', exist_ok=True)
-        
-        connection = sqlite3.connect(db_path)
-        print(f"Successfully connected to SQLite database at {db_path}")
-        return connection
+        # Test connection
+        client.admin.command('ping')
+        print("Successfully connected to MongoDB!")
+        return db
     except Exception as e:
-        print(f"Error connecting to SQLite: {e}")
+        print(f"Error connecting to MongoDB: {e}")
         return None
 
 
-def load_recipes(connection, file_path='processed/recipes_processed.csv'):
+def load_recipes(db, file_path='processed/recipes_processed.csv'):
     """
     Load recipes into database
     """
@@ -44,13 +44,10 @@ def load_recipes(connection, file_path='processed/recipes_processed.csv'):
     recipes_df = pd.read_csv(file_path)
     print(f"Found {len(recipes_df)} recipes")
     
-    # Prepare INSERT query
-    cursor = connection.cursor()
-    
-    insert_query = """
-        INSERT OR REPLACE INTO recipes (id, name, ingredients, calories, protein, fat, carbs, sugar, sodium, gl, steps, image_url)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """
+    # Target collection
+    collection = db.recipes
+    print("Clearing existing recipes...")
+    collection.delete_many({})
     
     # Insert in batches
     batch_size = 1000
@@ -60,38 +57,37 @@ def load_recipes(connection, file_path='processed/recipes_processed.csv'):
     for i in range(0, total, batch_size):
         batch = recipes_df.iloc[i:i+batch_size]
         
-        values = []
+        documents = []
         for _, row in batch.iterrows():
-            values.append((
-                int(row['id']),
-                str(row['name'])[:255],  # Limit to 255 chars
-                str(row['ingredients'])[:65535],  # TEXT limit
-                int(row['calories']) if pd.notna(row['calories']) else 0,
-                float(row['protein']) if pd.notna(row['protein']) else 0.0,
-                float(row['fat']) if pd.notna(row['fat']) else 0.0,
-                float(row['carbs']) if pd.notna(row['carbs']) else 0.0,
-                float(row['sugar']) if pd.notna(row['sugar']) else 0.0,
-                float(row['sodium']) if pd.notna(row['sodium']) else 0.0,
-                float(row['gl']) if pd.notna(row['gl']) else 0.0,
-                str(row['steps'])[:65535] if pd.notna(row['steps']) else '',
-                str(row['image_url'])[:500] if pd.notna(row['image_url']) else ''
-            ))
+            documents.append({
+                '_id': int(row['id']),
+                'name': str(row['name'])[:255],
+                'ingredients': str(row['ingredients']),
+                'calories': int(row['calories']) if pd.notna(row['calories']) else 0,
+                'protein': float(row['protein']) if pd.notna(row['protein']) else 0.0,
+                'fat': float(row['fat']) if pd.notna(row['fat']) else 0.0,
+                'carbs': float(row['carbs']) if pd.notna(row['carbs']) else 0.0,
+                'sugar': float(row['sugar']) if pd.notna(row['sugar']) else 0.0,
+                'sodium': float(row['sodium']) if pd.notna(row['sodium']) else 0.0,
+                'gl': float(row['gl']) if pd.notna(row['gl']) else 0.0,
+                'steps': str(row['steps']) if pd.notna(row['steps']) else '',
+                'image_url': str(row['image_url'])[:500] if pd.notna(row['image_url']) else ''
+            })
         
         try:
-            cursor.executemany(insert_query, values)
-            connection.commit()
-            inserted += len(values)
+            if documents:
+                collection.insert_many(documents, ordered=False)
+                inserted += len(documents)
             print(f"Progress: {inserted}/{total} recipes loaded ({(inserted/total)*100:.1f}%)")
         except Exception as e:
-            print(f"Error inserting batch: {e}")
-            connection.rollback()
-    
-    cursor.close()
+            # ordered=False allows continuing on duplicate key errors
+            print(f"Error in batch: {e}")
+            
     print(f"✓ Successfully loaded {inserted} recipes")
     return True
 
 
-def load_ratings(connection, file_path='processed/ratings_processed.csv'):
+def load_ratings(db, file_path='processed/ratings_processed.csv'):
     """
     Load ratings into database
     """
@@ -106,13 +102,13 @@ def load_ratings(connection, file_path='processed/ratings_processed.csv'):
     ratings_df = pd.read_csv(file_path)
     print(f"Found {len(ratings_df)} ratings")
     
-    # Prepare INSERT query
-    cursor = connection.cursor()
+    # Target collection
+    collection = db.ratings
+    print("Clearing existing ratings...")
+    collection.delete_many({})
     
-    insert_query = """
-        INSERT OR REPLACE INTO ratings (user_id, recipe_id, rating, timestamp, month_index)
-        VALUES (?, ?, ?, ?, ?)
-    """
+    # Create compound index for fast queries
+    collection.create_index([("user_id", 1), ("recipe_id", 1)], unique=True)
     
     # Insert in batches
     batch_size = 5000
@@ -122,31 +118,28 @@ def load_ratings(connection, file_path='processed/ratings_processed.csv'):
     for i in range(0, total, batch_size):
         batch = ratings_df.iloc[i:i+batch_size]
         
-        values = []
+        documents = []
         for _, row in batch.iterrows():
-            values.append((
-                int(row['user_id']),
-                int(row['recipe_id']),
-                int(row['rating']),
-                pd.to_datetime(row['timestamp']).strftime('%Y-%m-%d %H:%M:%S'),
-                int(row['month_index'])
-            ))
+            documents.append({
+                'user_id': int(row['user_id']),
+                'recipe_id': int(row['recipe_id']),
+                'rating': int(row['rating']),
+                'timestamp': pd.to_datetime(row['timestamp']).isoformat(),
+                'month_index': int(row['month_index'])
+            })
         
         try:
-            cursor.executemany(insert_query, values)
-            connection.commit()
-            inserted += len(values)
+            if documents:
+                collection.insert_many(documents, ordered=False)
+                inserted += len(documents)
             print(f"Progress: {inserted}/{total} ratings loaded ({(inserted/total)*100:.1f}%)")
         except Exception as e:
-            print(f"Error inserting batch: {e}")
-            connection.rollback()
-    
-    cursor.close()
+            pass # ordered=False continues on duplicates
     print(f"✓ Successfully loaded {inserted} ratings")
     return True
 
 
-def verify_data(connection):
+def verify_data(db):
     """
     Verify loaded data
     """
@@ -154,32 +147,24 @@ def verify_data(connection):
     print("Verifying Database")
     print("=" * 60)
     
-    cursor = connection.cursor()
-    
     # Count recipes
-    cursor.execute("SELECT COUNT(*) FROM recipes")
-    recipe_count = cursor.fetchone()[0]
+    recipe_count = db.recipes.count_documents({})
     print(f"✓ Recipes in database: {recipe_count}")
     
     # Count ratings
-    cursor.execute("SELECT COUNT(*) FROM ratings")
-    rating_count = cursor.fetchone()[0]
+    rating_count = db.ratings.count_documents({})
     print(f"✓ Ratings in database: {rating_count}")
     
     # Count unique users in ratings
-    cursor.execute("SELECT COUNT(DISTINCT user_id) FROM ratings")
-    user_count = cursor.fetchone()[0]
+    user_count = len(db.ratings.distinct('user_id'))
     print(f"✓ Unique users with ratings: {user_count}")
     
     # Get sample recipe
-    cursor.execute("SELECT name, calories, protein, fat, carbs FROM recipes LIMIT 1")
-    sample = cursor.fetchone()
+    sample = db.recipes.find_one()
     if sample:
         print(f"\nSample Recipe:")
-        print(f"  Name: {sample[0]}")
-        print(f"  Calories: {sample[1]}, Protein: {sample[2]}, Fat: {sample[3]}, Carbs: {sample[4]}")
-    
-    cursor.close()
+        print(f"  Name: {sample.get('name')}")
+        print(f"  Calories: {sample.get('calories')}, Protein: {sample.get('protein')}")
 
 
 def main():
@@ -187,30 +172,14 @@ def main():
     Main function to load all data
     """
     print("=" * 60)
-    print("Loading Food.com Data into SQLite")
+    print("Loading Food.com Data into MongoDB")
     print("=" * 60)
     
     # Check if database exists
-    connection = get_db_connection()
+    db = get_db()
     
-    if not connection:
+    if db is None:
         print("\nERROR: Could not connect to database!")
-        print("Please ensure:")
-        print("1. Backend .env file has correct DATABASE_PATH")
-        print("2. Run database.sql first to create tables")
-        return
-    
-    # Create tables first
-    print("\n" + "=" * 60)
-    print("Creating Database Tables")
-    print("=" * 60)
-    try:
-        with open(os.path.join(os.path.dirname(__file__), '..', 'database.sql'), 'r') as f:
-            schema_sql = f.read()
-            connection.executescript(schema_sql)
-            print("✓ Database tables created successfully")
-    except Exception as e:
-        print(f"Error creating tables: {e}")
         return
     
     try:
@@ -218,7 +187,7 @@ def main():
         print("\n" + "=" * 60)
         print("Step 1: Loading Recipes")
         print("=" * 60)
-        if not load_recipes(connection):
+        if not load_recipes(db):
             print("Failed to load recipes")
             return
         
@@ -226,12 +195,12 @@ def main():
         print("\n" + "=" * 60)
         print("Step 2: Loading Ratings")
         print("=" * 60)
-        if not load_ratings(connection):
+        if not load_ratings(db):
             print("Failed to load ratings")
             return
         
         # Verify
-        verify_data(connection)
+        verify_data(db)
         
         print("\n" + "=" * 60)
         print("✓ Data Loading Complete!")
@@ -239,8 +208,7 @@ def main():
         print("You can now start the backend server (python app.py)")
         
     finally:
-        connection.close()
-        print("\nDatabase connection closed")
+        print("\nProcess finished.")
 
 
 if __name__ == '__main__':
