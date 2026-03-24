@@ -8,6 +8,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from datetime import datetime
 import os
+import subprocess
 import sys
 from dotenv import load_dotenv
 
@@ -27,6 +28,22 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key')
 # ==================== Database Setup & Fix ====================
 def initialize_and_fix_db():
     print("Checking database schema...")
+    
+    # Auto-download full database from Google Drive if missing or LFS pointer
+    db_path = os.path.join(os.path.dirname(__file__), '..', 'food_db.sqlite')
+    if not os.path.exists(db_path) or os.path.getsize(db_path) < 10000000:  # < 10MB
+        print("Database is missing or is an LFS pointer. Downloading from Google Drive...")
+        try:
+            # REPLACE THE ID BELOW WITH YOUR GOOGLE DRIVE FILE ID
+            file_id = "YOUR_FILE_ID_HERE"
+            url = f"https://drive.google.com/uc?id={file_id}"
+            
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "gdown"])
+            import gdown
+            gdown.download(url, db_path, quiet=False)
+            print("Database downloaded successfully!")
+        except Exception as e:
+            print(f"Failed to download database: {e}")
             
     conn = db.get_db_connection()
     if conn:
