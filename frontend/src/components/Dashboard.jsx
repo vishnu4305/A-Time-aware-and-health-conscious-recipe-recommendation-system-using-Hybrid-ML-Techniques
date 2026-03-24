@@ -37,19 +37,7 @@ function Dashboard({ user }) {
           recipes_per_meal: 3
         });
 
-        let plan = response.data;
-        
-        // Ultimate Front-End Fallback for empty meal plans
-        if (!plan || !plan.breakfast || plan.breakfast.length === 0) {
-          plan = {
-            "breakfast": [{id: 2, name: 'Oatmeal with Berries', meal_type: 'breakfast', dietary_restrictions: 'vegetarian', ingredients: 'oats, milk, strawberries', instructions: 'Boil oats with milk. Top with fresh berries.', calories: 250, protein: 8, carbs: 45, fat: 4}],
-            "lunch": [{id: 1, name: 'Healthy Grilled Chicken Salad', meal_type: 'lunch', dietary_restrictions: 'high-protein', ingredients: 'chicken breast, lettuce', instructions: 'Grill the chicken. Toss with olive oil.', calories: 350, protein: 45, carbs: 10, fat: 15}],
-            "dinner": [{id: 4, name: 'Baked Salmon with Asparagus', meal_type: 'dinner', dietary_restrictions: 'pescatarian', ingredients: 'salmon fillet, asparagus', instructions: 'Bake salmon and asparagus at 400F for 15 mins.', calories: 450, protein: 35, carbs: 8, fat: 28}],
-            "snacks": [{id: 3, name: 'Avocado Toast with Egg', meal_type: 'snack', dietary_restrictions: 'vegetarian', ingredients: 'whole wheat bread, avocado, egg', instructions: 'Toast bread. Mash avocado.', calories: 320, protein: 12, carbs: 20, fat: 22}]
-          };
-        }
-        
-        setMealPlan(plan);
+        setMealPlan(response.data);
         setRecommendations([]);
       } else {
         // Get normal recommendations
@@ -60,19 +48,7 @@ function Dashboard({ user }) {
           top_n: 12
         });
 
-        let recs = response.data.recommendations || [];
-        
-        // Ultimate Front-End Fallback for empty recipes
-        if (recs.length === 0) {
-          recs = [
-            {id: 1, name: 'Healthy Grilled Chicken Salad', meal_type: 'lunch, dinner', dietary_restrictions: 'high-protein, low-carb', ingredients: 'chicken breast, lettuce, tomatoes, cucumbers, olive oil', instructions: 'Grill the chicken. Chop vegetables. Toss with olive oil.', calories: 350, protein: 45, carbs: 10, fat: 15},
-            {id: 2, name: 'Oatmeal with Berries', meal_type: 'breakfast', dietary_restrictions: 'vegetarian, high-fiber', ingredients: 'oats, milk, strawberries, blueberries, honey', instructions: 'Boil oats with milk. Top with fresh berries and honey.', calories: 250, protein: 8, carbs: 45, fat: 4},
-            {id: 3, name: 'Avocado Toast with Egg', meal_type: 'breakfast, lunch', dietary_restrictions: 'vegetarian', ingredients: 'whole wheat bread, avocado, egg, salt, pepper', instructions: 'Toast bread. Mash avocado. Top with fried egg.', calories: 320, protein: 12, carbs: 20, fat: 22},
-            {id: 4, name: 'Baked Salmon with Asparagus', meal_type: 'dinner', dietary_restrictions: 'pescatarian, keto', ingredients: 'salmon fillet, asparagus, lemon, garlic, butter', instructions: 'Bake salmon and asparagus at 400F for 15 mins.', calories: 450, protein: 35, carbs: 8, fat: 28}
-          ];
-        }
-        
-        setRecommendations(recs);
+        setRecommendations(response.data.recommendations || []);
         setMealPlan(null);
       }
     } catch (err) {
