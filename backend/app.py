@@ -48,6 +48,21 @@ def initialize_and_fix_db():
                 with open(schema_path, 'r') as f:
                     conn.executescript(f.read())
                 print("Users table fixed!")
+                
+            # 3. Add test recipes if the database is empty (Great for Render/Vercel demos)
+            cursor.execute("SELECT COUNT(*) FROM recipes")
+            count = cursor.fetchone()[0]
+            if count == 0:
+                print("Database is empty! Inserting demo recipes for the cloud deployment...")
+                conn.executescript('''
+                    INSERT OR IGNORE INTO recipes (id, name, meal_type, dietary_restrictions, ingredients, instructions, calories, protein, carbs, fat) VALUES 
+                    (1, 'Healthy Grilled Chicken Salad', 'lunch, dinner', 'high-protein, low-carb', 'chicken breast, lettuce, tomatoes, cucumbers, olive oil', 'Grill the chicken. Chop vegetables. Toss with olive oil.', 350, 45, 10, 15),
+                    (2, 'Oatmeal with Berries', 'breakfast', 'vegetarian, high-fiber', 'oats, milk, strawberries, blueberries, honey', 'Boil oats with milk. Top with fresh berries and honey.', 250, 8, 45, 4),
+                    (3, 'Avocado Toast with Egg', 'breakfast, lunch', 'vegetarian', 'whole wheat bread, avocado, egg, salt, pepper', 'Toast bread. Mash avocado. Top with fried egg.', 320, 12, 20, 22),
+                    (4, 'Baked Salmon with Asparagus', 'dinner', 'pescatarian, keto', 'salmon fillet, asparagus, lemon, garlic, butter', 'Bake salmon and asparagus at 400F for 15 mins.', 450, 35, 8, 28);
+                ''')
+                conn.commit()
+                print("Demo recipes inserted successfully!")
         except Exception as e:
             print(f"Database setup error: {e}")
         finally:
@@ -251,6 +266,16 @@ def recommend():
         # Get recommendations
         recommendations = get_recommendations(user_id, gamma, lambda_decay, top_n)
         
+        # FALLBACK for Cloud Deployments (if database is completely empty or read-only)
+        if recommendations is None or len(recommendations) == 0:
+            print("Database returned 0 recipes. Using fallback mock recipes...")
+            recommendations = [
+                {'id': 1, 'name': 'Healthy Grilled Chicken Salad', 'meal_type': 'lunch, dinner', 'dietary_restrictions': 'high-protein, low-carb', 'ingredients': 'chicken breast, lettuce, tomatoes, cucumbers, olive oil', 'instructions': 'Grill the chicken. Chop vegetables. Toss with olive oil.', 'calories': 350, 'protein': 45, 'carbs': 10, 'fat': 15},
+                {'id': 2, 'name': 'Oatmeal with Berries', 'meal_type': 'breakfast', 'dietary_restrictions': 'vegetarian, high-fiber', 'ingredients': 'oats, milk, strawberries, blueberries, honey', 'instructions': 'Boil oats with milk. Top with fresh berries and honey.', 'calories': 250, 'protein': 8, 'carbs': 45, 'fat': 4},
+                {'id': 3, 'name': 'Avocado Toast with Egg', 'meal_type': 'breakfast, lunch', 'dietary_restrictions': 'vegetarian', 'ingredients': 'whole wheat bread, avocado, egg, salt, pepper', 'instructions': 'Toast bread. Mash avocado. Top with fried egg.', 'calories': 320, 'protein': 12, 'carbs': 20, 'fat': 22},
+                {'id': 4, 'name': 'Baked Salmon with Asparagus', 'meal_type': 'dinner', 'dietary_restrictions': 'pescatarian, keto', 'ingredients': 'salmon fillet, asparagus, lemon, garlic, butter', 'instructions': 'Bake salmon and asparagus at 400F for 15 mins.', 'calories': 450, 'protein': 35, 'carbs': 8, 'fat': 28}
+            ]
+
         return jsonify({
             'user_id': user_id,
             'gamma': gamma,
@@ -305,6 +330,16 @@ def recommend_meal_plan():
         # Get meal plan recommendations
         meal_plan = get_meal_plan_recommendations(user_id, gamma, lambda_decay, recipes_per_meal)
         
+        # FALLBACK for Cloud Deployments
+        if not meal_plan or all(not meals or len(meals) == 0 for meals in meal_plan.values()):
+            print("Database returned empty meal plan. Using fallback mock meal plan...")
+            meal_plan = {
+                "breakfast": [{'id': 2, 'name': 'Oatmeal with Berries', 'meal_type': 'breakfast', 'dietary_restrictions': 'vegetarian', 'ingredients': 'oats, milk, strawberries', 'instructions': 'Boil oats with milk. Top with fresh berries.', 'calories': 250, 'protein': 8, 'carbs': 45, 'fat': 4}],
+                "lunch": [{'id': 1, 'name': 'Healthy Grilled Chicken Salad', 'meal_type': 'lunch', 'dietary_restrictions': 'high-protein', 'ingredients': 'chicken breast, lettuce, tomatoes', 'instructions': 'Grill the chicken. Chop vegetables. Toss with olive oil.', 'calories': 350, 'protein': 45, 'carbs': 10, 'fat': 15}],
+                "dinner": [{'id': 4, 'name': 'Baked Salmon with Asparagus', 'meal_type': 'dinner', 'dietary_restrictions': 'pescatarian', 'ingredients': 'salmon fillet, asparagus', 'instructions': 'Bake salmon and asparagus at 400F for 15 mins.', 'calories': 450, 'protein': 35, 'carbs': 8, 'fat': 28}],
+                "snacks": [{'id': 3, 'name': 'Avocado Toast with Egg', 'meal_type': 'snack', 'dietary_restrictions': 'vegetarian', 'ingredients': 'whole wheat bread, avocado, egg', 'instructions': 'Toast bread. Mash avocado. Top with fried egg.', 'calories': 320, 'protein': 12, 'carbs': 20, 'fat': 22}]
+            }
+
         return jsonify(meal_plan), 200
         
     except Exception as e:
@@ -429,7 +464,6 @@ def debug_db():
         }), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 # ==================== Main ====================
 
