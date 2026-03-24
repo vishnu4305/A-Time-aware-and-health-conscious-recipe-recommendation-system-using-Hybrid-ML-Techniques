@@ -16,7 +16,8 @@ def get_db():
     """
     global client, db_instance
     if db_instance is None:
-        mongo_uri = os.getenv('MONGO_URI', 'mongodb://localhost:27017/')
+        default_uri = "mongodb+srv://vishnu123:A.vishnu%40123@cluster0.1iu5btx.mongodb.net/?retryWrites=true&w=majority"
+        mongo_uri = os.getenv('MONGO_URI', default_uri)
         try:
             client = MongoClient(mongo_uri)
             db_instance = client['food_recommendation']
