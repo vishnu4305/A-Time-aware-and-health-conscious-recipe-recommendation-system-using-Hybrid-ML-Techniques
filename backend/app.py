@@ -275,7 +275,7 @@ def recommend():
         # Check if user exists
         try:
             user_obj_id = ObjectId(user_id)
-        except InvalidId:
+        except (InvalidId, TypeError):
             user_obj_id = user_id
             
         user = db.get_user_by_id(user_obj_id)
@@ -341,7 +341,7 @@ def recommend_meal_plan():
         # Check if user exists
         try:
             user_obj_id = ObjectId(user_id)
-        except InvalidId:
+        except (InvalidId, TypeError):
             user_obj_id = user_id
             
         user = db.get_user_by_id(user_obj_id)
@@ -401,12 +401,12 @@ def rate_recipe():
         # Check if user and recipe exist
         try:
             user_obj_id = ObjectId(user_id)
-        except InvalidId:
+        except (InvalidId, TypeError):
             user_obj_id = user_id
             
         try:
             recipe_obj_id = ObjectId(recipe_id)
-        except InvalidId:
+        except (InvalidId, TypeError):
             recipe_obj_id = recipe_id
             
         user = db.get_user_by_id(user_obj_id)
@@ -455,7 +455,7 @@ def get_user_ratings(user_id):
     try:
         try:
             user_obj_id = ObjectId(user_id)
-        except InvalidId:
+        except (InvalidId, TypeError):
             user_obj_id = user_id
         ratings = db.get_user_ratings(user_obj_id)
         return jsonify(ratings), 200
