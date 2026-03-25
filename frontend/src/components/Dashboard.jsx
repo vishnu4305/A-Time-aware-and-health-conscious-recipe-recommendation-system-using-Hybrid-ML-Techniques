@@ -17,6 +17,13 @@ function Dashboard({ user }) {
   const [selectedRecipe, setSelectedRecipe] = useState(null);
   const [viewMode, setViewMode] = useState('normal'); // 'normal' or 'meal-plan'
 
+  // Safely parse conditions whether they are an array or a JSON string
+  const getConditionsList = () => {
+    if (!user || !user.conditions) return [];
+    if (Array.isArray(user.conditions)) return user.conditions;
+    try { return JSON.parse(user.conditions); } catch (e) { return []; }
+  };
+
   const getGammaLabel = () => {
     if (gamma === 0) return 'Pure Taste';
     if (gamma === 1) return 'Pure Health';
@@ -100,10 +107,10 @@ function Dashboard({ user }) {
               <p className="mb-1 text-muted">
                 <strong>Age:</strong> {user.age} | <strong>Height:</strong> {user.height} cm | <strong>Weight:</strong> {user.weight} kg
               </p>
-              {user.conditions && JSON.parse(user.conditions).length > 0 && (
+              {getConditionsList().length > 0 && (
                 <p className="mb-0">
                   <strong>Health Conditions:</strong>{' '}
-                  {JSON.parse(user.conditions).map((condition, idx) => (
+                  {getConditionsList().map((condition, idx) => (
                     <Badge key={idx} bg="warning" text="dark" className="me-1">
                       {condition}
                     </Badge>
