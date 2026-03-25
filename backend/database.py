@@ -3,6 +3,8 @@ Database connection module for MongoDB
 """
 import os
 from pymongo import MongoClient
+from bson.objectid import ObjectId
+from bson.errors import InvalidId
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -26,6 +28,19 @@ def get_db():
             print(f"Error connecting to MongoDB: {e}")
     return db_instance
 
+def parse_id(id_val):
+    """Safely parse an ID to ObjectId, int, or string"""
+    if isinstance(id_val, ObjectId) or isinstance(id_val, int):
+        return id_val
+    if isinstance(id_val, str):
+        try:
+            return ObjectId(id_val)
+        except InvalidId:
+            if id_val.isdigit():
+                return int(id_val)
+            return id_val
+    return id_val
+
 def get_next_sequence_value(sequence_name):
     """Helper for auto-incrementing integer IDs in MongoDB to maintain ML model compatibility"""
     database = get_db()
@@ -47,16 +62,16 @@ def get_user_by_username(username):
     database = get_db()
     user = database.users.find_one({'username': username})
     if user:
-        user['id'] = user.get('_id')
+        user['id'] = str(user.get('_id'))
     return user
 
 
 def get_user_by_id(user_id):
     """Get user by ID"""
     database = get_db()
-    user = database.users.find_one({'_id': user_id})
+    user = database.users.find_one({'_id': parse_id(user_id)})
     if user:
-        user['id'] = user.get('_id')
+        user['id'] = str(user.get('_id'))
     return user
 
 
@@ -83,7 +98,7 @@ def update_user(user_id, name, age, height, weight, gender, conditions, activity
     """Update an existing user"""
     database = get_db()
     database.users.update_one(
-        {'_id': user_id},
+        {'_id': parse_id(user_id)},
         {'$set': {
             'name': name,
             'age': age,
@@ -106,16 +121,16 @@ def get_all_recipes(limit=None):
     
     recipes = list(cursor)
     for r in recipes:
-        r['id'] = r.pop('_id', r.get('id'))
+        r['id'] = str(r.pop('_id', r.get('id')))
     return recipes
 
 
 def get_recipe_by_id(recipe_id):
     """Get recipe by ID"""
     database = get_db()
-    recipe = database.recipes.find_one({'_id': recipe_id})
+    recipe = database.recipes.find_one({'_id': parse_id(recipe_id)})
     if recipe:
-        recipe['id'] = recipe.pop('_id', recipe.get('id'))
+        recipe['id'] = str(recipe.pop('_id', recipe.get('id')))
     return recipe
 
 
@@ -128,7 +143,7 @@ def get_all_ratings(limit=None):
         
     ratings = list(cursor)
     for r in ratings:
-        r['id'] = r.get('_id')
+        r['id'] = str(r.get('_id'))
     return ratings
 
 
@@ -141,9 +156,9 @@ def get_rating_count():
 def get_user_ratings(user_id):
     """Get ratings for a specific user"""
     database = get_db()
-    ratings = list(database.ratings.find({'user_id': user_id}))
+    ratings = list(database.ratings.find({'user_id': parse_id(user_id)}))
     for r in ratings:
-        r['id'] = r.get('_id')
+        r['id'] = str(r.get('_id'))
     return ratings
 
 
@@ -152,7 +167,7 @@ def add_rating(user_id, recipe_id, rating, timestamp, month_index):
     database = get_db()
     timestamp_str = timestamp.isoformat() if hasattr(timestamp, 'isoformat') else timestamp
     database.ratings.update_one(
-        {'user_id': user_id, 'recipe_id': recipe_id},
+        {'user_id': parse_id(user_id), 'recipe_id': parse_id(recipe_id)},
         {'$set': {
             'rating': rating,
             'timestamp': timestamp_str,
@@ -178,7 +193,7 @@ def get_random_recipes(limit=10):
     pipeline = [{'$match': {'ingredients': {'$ne': None}}}, {'$sample': {'size': limit}}]
     recipes = list(database.recipes.aggregate(pipeline))
     for r in recipes:
-        r['id'] = r.pop('_id', r.get('id'))
+        r['id'] = str(r.pop('_id', r.get('id')))
     return recipes
 
 
@@ -187,5 +202,5 @@ def get_recipes_with_offset(skip_amount, limit_amount):
     database = get_db()
     recipes = list(database.recipes.find().skip(skip_amount).limit(limit_amount))
     for r in recipes:
-        r['id'] = r.pop('_id', r.get('id'))
+        r['id'] = str(r.pop('_id', r.get('id')))
     return recipes

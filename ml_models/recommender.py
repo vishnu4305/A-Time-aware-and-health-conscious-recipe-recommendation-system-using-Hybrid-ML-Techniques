@@ -7,7 +7,6 @@ import os
 import numpy as np
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
-from bson.objectid import ObjectId, InvalidId
 
 # Add backend to path for database access
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'backend'))
@@ -16,12 +15,6 @@ import database as db
 from .embeddings import get_or_compute_embeddings, encode_user_profile, compute_similarity
 from .health_rules import calculate_health_score, get_health_explanation
 
-
-def _safe_get_user(user_id):
-    try:
-        return db.get_user_by_id(ObjectId(user_id))
-    except (InvalidId, TypeError):
-        return db.get_user_by_id(user_id)
 
 # Global cache for data
 _recipes_df = None
@@ -344,7 +337,7 @@ def health_based_scoring(user_id):
     Returns:
         Health scores for all recipes
     """
-    user = _safe_get_user(user_id)
+    user = db.get_user_by_id(user_id)
     
     if not user:
         return np.zeros(len(_recipes_df))
@@ -384,7 +377,7 @@ def get_recommendations(user_id, gamma=0.5, lambda_decay=2.5, top_n=10):
         return []
     
     # Get user profile
-    user = _safe_get_user(user_id)
+    user = db.get_user_by_id(user_id)
     if not user:
         return []
     
@@ -529,7 +522,7 @@ def get_meal_plan_recommendations(user_id, gamma=0.5, lambda_decay=2.5, recipes_
         }
     
     # Get user profile
-    user = _safe_get_user(user_id)
+    user = db.get_user_by_id(user_id)
     if not user:
         return {
             'meal_plan': {

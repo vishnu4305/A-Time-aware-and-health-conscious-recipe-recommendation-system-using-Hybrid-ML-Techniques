@@ -11,7 +11,6 @@ import os
 import threading
 import sys
 from dotenv import load_dotenv
-from bson.objectid import ObjectId, InvalidId
 
 # Add ml_models to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -145,14 +144,11 @@ def get_user(user_id):
     Get user profile by ID
     """
     try:
-        # Convert string ID to MongoDB ObjectId
-        user = db.get_user_by_id(ObjectId(user_id))
+        user = db.get_user_by_id(user_id)
         if user:
             return jsonify(user), 200
         else:
             return jsonify({'error': 'User not found'}), 404
-    except InvalidId:
-        return jsonify({'error': 'Invalid user ID format'}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -178,7 +174,6 @@ def update_user_profile(user_id):
     Update an existing user profile
     """
     try:
-        user_obj_id = ObjectId(user_id)
         data = request.json
         name = data.get('name')
         age = data.get('age')
@@ -191,15 +186,13 @@ def update_user_profile(user_id):
         if not all([name, age, height, weight]):
             return jsonify({'error': 'Missing required fields'}), 400
         
-        db.update_user(user_obj_id, name, age, height, weight, gender, conditions, activity_level)
-        user = db.get_user_by_id(user_obj_id)
+        db.update_user(user_id, name, age, height, weight, gender, conditions, activity_level)
+        user = db.get_user_by_id(user_id)
         
         return jsonify({
             'message': 'User updated successfully',
             'user': user
         }), 200
-    except InvalidId:
-        return jsonify({'error': 'Invalid user ID format'}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -226,14 +219,11 @@ def get_recipe(recipe_id):
     Get recipe details by ID
     """
     try:
-        # Convert string ID to MongoDB ObjectId
-        recipe = db.get_recipe_by_id(ObjectId(recipe_id))
+        recipe = db.get_recipe_by_id(recipe_id)
         if recipe:
             return jsonify(recipe), 200
         else:
             return jsonify({'error': 'Recipe not found'}), 404
-    except InvalidId:
-        return jsonify({'error': 'Invalid recipe ID format'}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -273,12 +263,7 @@ def recommend():
             return jsonify({'error': 'lambda_decay must be between 0.5 and 4'}), 400
         
         # Check if user exists
-        try:
-            user_obj_id = ObjectId(user_id)
-        except (InvalidId, TypeError):
-            user_obj_id = user_id
-            
-        user = db.get_user_by_id(user_obj_id)
+        user = db.get_user_by_id(user_id)
         if not user:
             return jsonify({'error': 'User not found'}), 404
         
@@ -339,12 +324,7 @@ def recommend_meal_plan():
             return jsonify({'error': 'lambda_decay must be between 0.5 and 4'}), 400
         
         # Check if user exists
-        try:
-            user_obj_id = ObjectId(user_id)
-        except (InvalidId, TypeError):
-            user_obj_id = user_id
-            
-        user = db.get_user_by_id(user_obj_id)
+        user = db.get_user_by_id(user_id)
         if not user:
             return jsonify({'error': 'User not found'}), 404
         
@@ -399,18 +379,8 @@ def rate_recipe():
             return jsonify({'error': 'Rating must be between 1 and 5'}), 400
         
         # Check if user and recipe exist
-        try:
-            user_obj_id = ObjectId(user_id)
-        except (InvalidId, TypeError):
-            user_obj_id = user_id
-            
-        try:
-            recipe_obj_id = ObjectId(recipe_id)
-        except (InvalidId, TypeError):
-            recipe_obj_id = recipe_id
-            
-        user = db.get_user_by_id(user_obj_id)
-        recipe = db.get_recipe_by_id(recipe_obj_id)
+        user = db.get_user_by_id(user_id)
+        recipe = db.get_recipe_by_id(recipe_id)
         
         if not user:
             return jsonify({'error': 'User not found'}), 404
@@ -453,11 +423,7 @@ def get_user_ratings(user_id):
     Get all ratings for a specific user
     """
     try:
-        try:
-            user_obj_id = ObjectId(user_id)
-        except (InvalidId, TypeError):
-            user_obj_id = user_id
-        ratings = db.get_user_ratings(user_obj_id)
+        ratings = db.get_user_ratings(user_id)
         return jsonify(ratings), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
