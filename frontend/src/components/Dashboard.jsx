@@ -5,7 +5,7 @@ import RecipeCard from './RecipeCard';
 import RecipeDetail from './RecipeDetail';
 import MealPlanView from './MealPlanView';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API_BASE_URL = 'https://recipe-recommender-api-57hq.onrender.com';
 
 function Dashboard({ user }) {
   const [gamma, setGamma] = useState(0.5);
@@ -30,8 +30,8 @@ function Dashboard({ user }) {
     try {
       if (viewMode === 'meal-plan') {
         // Get meal plan
-        const response = await axios.post(`${API_URL}/recommend/meal-plan`, {
-          user_id: user.id,
+        const response = await axios.post(`${API_BASE_URL}/recommend/meal-plan`, {
+          user_id: user._id || user.id,
           gamma: gamma,
           lambda_decay: lambda,
           recipes_per_meal: 3
@@ -41,8 +41,8 @@ function Dashboard({ user }) {
         setRecommendations([]);
       } else {
         // Get normal recommendations
-        const response = await axios.post(`${API_URL}/recommend`, {
-          user_id: user.id,
+        const response = await axios.post(`${API_BASE_URL}/recommend`, {
+          user_id: user._id || user.id,
           gamma: gamma,
           lambda_decay: lambda,
           top_n: 12
