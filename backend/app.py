@@ -81,12 +81,17 @@ def create_user():
         if not all([username, name, age, height, weight]):
             return jsonify({'error': 'Missing required fields'}), 400
         
-        # Check if user already exists
+        # Check if user already exists (Login flow)
         existing_user = db.get_user_by_username(username)
         if existing_user:
-            return jsonify({'error': 'Username already exists. Please choose another one.'}), 409
+            existing_user_id = existing_user.get('_id') or existing_user.get('id')
+            return jsonify({
+                'message': 'User logged in successfully',
+                'user_id': str(existing_user_id),
+                'user': existing_user
+            }), 200
         
-        # Create new user
+        # Create new user (Registration flow)
         user_id = db.create_user(username, name, age, height, weight, gender, conditions, activity_level)
         
         if user_id:
