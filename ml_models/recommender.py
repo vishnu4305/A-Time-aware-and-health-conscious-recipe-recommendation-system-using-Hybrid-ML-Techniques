@@ -43,9 +43,10 @@ def load_data():
     """
     global _recipes_df, _ratings_df, _embeddings, _max_month_index, _cached_rating_count
     
-    # Use smaller limits on Render's 512MB free tier to prevent Out-Of-Memory crashes
-    recipe_limit = int(os.environ.get('RECIPE_LIMIT', 2000 if os.environ.get('RENDER') else 10000))
-    rating_limit = int(os.environ.get('RATING_LIMIT', 5000 if os.environ.get('RENDER') else 50000))
+    # Use strictly smaller limits on Render's 512MB free tier to prevent Out-Of-Memory crashes
+    is_render = os.environ.get('RENDER') is not None
+    recipe_limit = int(os.environ.get('RECIPE_LIMIT', 500 if is_render else 10000))
+    rating_limit = int(os.environ.get('RATING_LIMIT', 2000 if is_render else 50000))
     
     # Load recipes
     recipes = db.get_all_recipes(limit=recipe_limit)
@@ -77,14 +78,20 @@ def load_data():
     embeddings_path = os.path.join(os.path.dirname(__file__), 'embeddings', 'recipe_embeddings.npy')
     os.makedirs(os.path.dirname(embeddings_path), exist_ok=True)
     
-    # Download from Google Drive if it doesn't exist locally
+    # Download from Google Drive only if NOT on Render free tier.
+    # The 356MB file is too large for 512MB RAM and causes an instant OOM crash.
     gdrive_id = os.environ.get('GDRIVE_EMBEDDINGS_ID', '1xoirnEQAGr4UxMgnq9hvcLGqmWq3WTCS')
-    if not os.path.exists(embeddings_path) and gdrive_id:
+    if not is_render and not os.path.exists(embeddings_path) and gdrive_id:
         download_from_gdrive(gdrive_id, embeddings_path)
     
     if not _recipes_df.empty:
         ingredients_list = _recipes_df['ingredients'].tolist()
-        _embeddings = get_or_compute_embeddings(ingredients_list, embeddings_path)
+        if is_render:
+            # Compute embeddings on-the-fly for the small subset (500 recipes) and save to a lightweight file
+            render_path = os.path.join(os.path.dirname(__file__), 'embeddings', 'render_embeddings.npy')
+            _embeddings = get_or_compute_embeddings(ingredients_list, render_path)
+        else:
+            _embeddings = get_or_compute_embeddings(ingredients_list, embeddings_path)
     
     print(f"Data loaded: {len(_recipes_df)} recipes, {len(_ratings_df)} ratings")
 
