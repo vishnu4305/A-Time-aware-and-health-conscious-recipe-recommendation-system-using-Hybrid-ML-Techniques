@@ -12,7 +12,6 @@ from sklearn.metrics.pairwise import cosine_similarity
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'backend'))
 import database as db
 
-from .embeddings import get_or_compute_embeddings, encode_user_profile, compute_similarity
 from .health_rules import calculate_health_score, get_health_explanation
 
 
@@ -110,6 +109,7 @@ def load_data():
             # Skip heavy PyTorch embeddings on Render Free Tier to prevent OOM
             _embeddings = None
         else:
+            from .embeddings import get_or_compute_embeddings
             _embeddings = get_or_compute_embeddings(ingredients_list, embeddings_path)
     
     print(f"Data loaded: {len(_recipes_df)} recipes, {len(_ratings_df)} ratings")
@@ -336,6 +336,8 @@ def content_based_filtering(user_id):
     # Get ingredients from rated recipes
     rated_recipe_ids = [str(rid) for rid in user_ratings['recipe_id'].tolist()]
     rated_ingredients = _recipes_df[_recipes_df['id'].astype(str).isin(rated_recipe_ids)]['ingredients'].tolist()
+    
+    from .embeddings import encode_user_profile, compute_similarity
     
     # Create user profile embedding
     user_embedding = encode_user_profile(rated_ingredients)

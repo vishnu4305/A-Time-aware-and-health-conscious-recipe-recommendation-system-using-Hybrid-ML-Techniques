@@ -195,7 +195,7 @@ def get_earliest_rating_timestamp():
 def get_random_recipes(limit=10, projection=None):
     """Get a random selection of recipes for cold start fallbacks"""
     database = get_db()
-    pipeline = [{'$match': {'ingredients': {'$ne': None}}}, {'$sample': {'size': limit}}]
+    pipeline = [{'$match': {'ingredients': {'$ne': None}}}]
     if projection:
         pipeline.append({'$project': projection})
     pipeline.append({'$sample': {'size': limit}})
