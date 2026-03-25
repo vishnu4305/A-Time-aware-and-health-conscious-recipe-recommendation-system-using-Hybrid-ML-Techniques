@@ -7,6 +7,7 @@ import os
 import numpy as np
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
+from bson.objectid import ObjectId, InvalidId
 
 # Add backend to path for database access
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'backend'))
@@ -15,6 +16,12 @@ import database as db
 from .embeddings import get_or_compute_embeddings, encode_user_profile, compute_similarity
 from .health_rules import calculate_health_score, get_health_explanation
 
+
+def _safe_get_user(user_id):
+    try:
+        return db.get_user_by_id(ObjectId(user_id))
+    except (InvalidId, TypeError):
+        return db.get_user_by_id(user_id)
 
 # Global cache for data
 _recipes_df = None
@@ -87,9 +94,8 @@ def load_data():
     if not _recipes_df.empty:
         ingredients_list = _recipes_df['ingredients'].tolist()
         if is_render:
-            # Compute embeddings on-the-fly for the small subset (500 recipes) and save to a lightweight file
-            render_path = os.path.join(os.path.dirname(__file__), 'embeddings', 'render_embeddings.npy')
-            _embeddings = get_or_compute_embeddings(ingredients_list, render_path)
+            # Skip heavy PyTorch embeddings on Render Free Tier to prevent OOM
+            _embeddings = None
         else:
             _embeddings = get_or_compute_embeddings(ingredients_list, embeddings_path)
     
@@ -338,7 +344,7 @@ def health_based_scoring(user_id):
     Returns:
         Health scores for all recipes
     """
-    user = db.get_user_by_id(user_id)
+    user = _safe_get_user(user_id)
     
     if not user:
         return np.zeros(len(_recipes_df))
@@ -378,7 +384,7 @@ def get_recommendations(user_id, gamma=0.5, lambda_decay=2.5, top_n=10):
         return []
     
     # Get user profile
-    user = db.get_user_by_id(user_id)
+    user = _safe_get_user(user_id)
     if not user:
         return []
     
@@ -523,7 +529,7 @@ def get_meal_plan_recommendations(user_id, gamma=0.5, lambda_decay=2.5, recipes_
         }
     
     # Get user profile
-    user = db.get_user_by_id(user_id)
+    user = _safe_get_user(user_id)
     if not user:
         return {
             'meal_plan': {

@@ -273,7 +273,12 @@ def recommend():
             return jsonify({'error': 'lambda_decay must be between 0.5 and 4'}), 400
         
         # Check if user exists
-        user = db.get_user_by_id(user_id)
+        try:
+            user_obj_id = ObjectId(user_id)
+        except InvalidId:
+            user_obj_id = user_id
+            
+        user = db.get_user_by_id(user_obj_id)
         if not user:
             return jsonify({'error': 'User not found'}), 404
         
@@ -334,7 +339,12 @@ def recommend_meal_plan():
             return jsonify({'error': 'lambda_decay must be between 0.5 and 4'}), 400
         
         # Check if user exists
-        user = db.get_user_by_id(user_id)
+        try:
+            user_obj_id = ObjectId(user_id)
+        except InvalidId:
+            user_obj_id = user_id
+            
+        user = db.get_user_by_id(user_obj_id)
         if not user:
             return jsonify({'error': 'User not found'}), 404
         
@@ -389,8 +399,18 @@ def rate_recipe():
             return jsonify({'error': 'Rating must be between 1 and 5'}), 400
         
         # Check if user and recipe exist
-        user = db.get_user_by_id(user_id)
-        recipe = db.get_recipe_by_id(recipe_id)
+        try:
+            user_obj_id = ObjectId(user_id)
+        except InvalidId:
+            user_obj_id = user_id
+            
+        try:
+            recipe_obj_id = ObjectId(recipe_id)
+        except InvalidId:
+            recipe_obj_id = recipe_id
+            
+        user = db.get_user_by_id(user_obj_id)
+        recipe = db.get_recipe_by_id(recipe_obj_id)
         
         if not user:
             return jsonify({'error': 'User not found'}), 404
@@ -427,13 +447,17 @@ def rate_recipe():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/ratings/<int:user_id>', methods=['GET'])
+@app.route('/ratings/<string:user_id>', methods=['GET'])
 def get_user_ratings(user_id):
     """
     Get all ratings for a specific user
     """
     try:
-        ratings = db.get_user_ratings(user_id)
+        try:
+            user_obj_id = ObjectId(user_id)
+        except InvalidId:
+            user_obj_id = user_id
+        ratings = db.get_user_ratings(user_obj_id)
         return jsonify(ratings), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
