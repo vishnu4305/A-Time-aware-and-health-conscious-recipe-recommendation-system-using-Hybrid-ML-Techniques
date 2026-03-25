@@ -37,6 +37,14 @@ def background_load():
 threading.Thread(target=background_load, daemon=True).start()
 
 
+# ==================== Root Route ====================
+@app.route('/', methods=['GET'])
+def home():
+    return jsonify({
+        'status': 'online',
+        'message': 'Welcome to the Time-Aware Recipe Recommendation API!'
+    }), 200
+
 # ==================== User Routes ====================
 
 @app.route('/user/create', methods=['POST'])
