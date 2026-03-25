@@ -11,6 +11,7 @@ import os
 import threading
 import sys
 from dotenv import load_dotenv
+from bson.objectid import ObjectId, InvalidId
 
 # Add ml_models to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -34,7 +35,9 @@ def background_load():
     except Exception as e:
         print(f"Background thread error: {e}")
 
-threading.Thread(target=background_load, daemon=True).start()
+# Disable background loading to prevent Out-Of-Memory (OOM) crashes on Render's Free Tier.
+# Data will be "lazy-loaded" on the very first recommendation request instead.
+# threading.Thread(target=background_load, daemon=True).start()
 
 
 # ==================== Root Route ====================
@@ -90,27 +93,34 @@ def create_user():
             user = db.get_user_by_id(user_id)
             return jsonify({
                 'message': 'User created successfully',
-                'user_id': user_id,
+                # Convert ObjectId to string for JSON serialization
+                'user_id': str(user_id),
                 'user': user
             }), 201
         else:
             return jsonify({'error': 'Failed to create user'}), 500
             
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f"An error occurred while creating a user: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': "An internal server error occurred."}), 500
 
 
-@app.route('/user/<int:user_id>', methods=['GET'])
+@app.route('/user/<string:user_id>', methods=['GET'])
 def get_user(user_id):
     """
     Get user profile by ID
     """
     try:
-        user = db.get_user_by_id(user_id)
+        # Convert string ID to MongoDB ObjectId
+        user = db.get_user_by_id(ObjectId(user_id))
         if user:
             return jsonify(user), 200
         else:
             return jsonify({'error': 'User not found'}), 404
+    except InvalidId:
+        return jsonify({'error': 'Invalid user ID format'}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -130,12 +140,13 @@ def get_user_by_username(username):
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/user/update/<int:user_id>', methods=['PUT'])
+@app.route('/user/update/<string:user_id>', methods=['PUT'])
 def update_user_profile(user_id):
     """
     Update an existing user profile
     """
     try:
+        user_obj_id = ObjectId(user_id)
         data = request.json
         name = data.get('name')
         age = data.get('age')
@@ -148,13 +159,15 @@ def update_user_profile(user_id):
         if not all([name, age, height, weight]):
             return jsonify({'error': 'Missing required fields'}), 400
         
-        db.update_user(user_id, name, age, height, weight, gender, conditions, activity_level)
-        user = db.get_user_by_id(user_id)
+        db.update_user(user_obj_id, name, age, height, weight, gender, conditions, activity_level)
+        user = db.get_user_by_id(user_obj_id)
         
         return jsonify({
             'message': 'User updated successfully',
             'user': user
         }), 200
+    except InvalidId:
+        return jsonify({'error': 'Invalid user ID format'}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -175,17 +188,20 @@ def get_recipes():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/recipes/<int:recipe_id>', methods=['GET'])
+@app.route('/recipes/<string:recipe_id>', methods=['GET'])
 def get_recipe(recipe_id):
     """
     Get recipe details by ID
     """
     try:
-        recipe = db.get_recipe_by_id(recipe_id)
+        # Convert string ID to MongoDB ObjectId
+        recipe = db.get_recipe_by_id(ObjectId(recipe_id))
         if recipe:
             return jsonify(recipe), 200
         else:
             return jsonify({'error': 'Recipe not found'}), 404
+    except InvalidId:
+        return jsonify({'error': 'Invalid recipe ID format'}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
