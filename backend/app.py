@@ -50,6 +50,38 @@ def home():
 
 # ==================== User Routes ====================
 
+@app.route('/user/login', methods=['POST'])
+def login_user():
+    """
+    Login an existing user
+    
+    Request JSON:
+    {
+        "username": "vishnu123"
+    }
+    """
+    try:
+        data = request.json
+        username = data.get('username')
+        
+        if not username:
+            return jsonify({'error': 'Username is required'}), 400
+            
+        user = db.get_user_by_username(username)
+        if user:
+            user_id = user.get('_id') or user.get('id')
+            return jsonify({
+                'message': 'Login successful',
+                'user_id': str(user_id),
+                'user': user
+            }), 200
+        else:
+            return jsonify({'error': 'User not found. Please register.'}), 404
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/user/create', methods=['POST'])
 def create_user():
     """
@@ -81,17 +113,12 @@ def create_user():
         if not all([username, name, age, height, weight]):
             return jsonify({'error': 'Missing required fields'}), 400
         
-        # Check if user already exists (Login flow)
+        # Check if user already exists
         existing_user = db.get_user_by_username(username)
         if existing_user:
-            existing_user_id = existing_user.get('_id') or existing_user.get('id')
-            return jsonify({
-                'message': 'User logged in successfully',
-                'user_id': str(existing_user_id),
-                'user': existing_user
-            }), 200
+            return jsonify({'error': 'Username already exists. Please choose another one or login.'}), 409
         
-        # Create new user (Registration flow)
+        # Create new user
         user_id = db.create_user(username, name, age, height, weight, gender, conditions, activity_level)
         
         if user_id:

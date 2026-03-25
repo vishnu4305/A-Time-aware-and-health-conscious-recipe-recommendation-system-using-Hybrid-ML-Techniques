@@ -240,3 +240,9 @@ html {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--primary-dark);
 }
+
+/* Auth Form Centering */
+.auth-container {
+  max-width: 550px;
+  margin: 5rem auto;
+}
