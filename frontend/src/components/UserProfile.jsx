@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { Card, Form, Button, Alert, Row, Col } from 'react-bootstrap';
-import { Container } from 'react-bootstrap';
+import { Card, Form, Button, Alert, Row, Col, Container } from 'react-bootstrap';
 
 const API_BASE_URL = 'https://recipe-recommender-api-57hq.onrender.com';
 
@@ -86,16 +85,68 @@ function UserProfile({ onUserCreated }) {
                      {!isNewUser ? (
                          <Form onSubmit={handleUsernameSubmit}>
                              <Form.Group className="mb-3">
-                                 />
+                                <Form.Label>Enter Your Username</Form.Label>
+                                <Form.Control 
+                                    type="text" 
+                                    placeholder="e.g., vishnu123" 
+                                    value={username} 
+                                    onChange={(e) => setUsername(e.target.value)} 
+                                    required 
+                                />
                              </Form.Group>
                              <Button variant="primary" type="submit" className="w-100" disabled={loading}>
                                  {loading ? 'Checking...' : 'Continue'}
                              </Button>
                          </Form>
                      ) : (
-                                 </Form.Group>
-                             </Col>
-                             </Row>
+                        <Form onSubmit={handleRegistrationSubmit}>
+                            <h5 className="text-center mb-3">Complete Your Profile</h5>
+                            <Row>
+                                <Col md={6}>
+                                    <Form.Group className="mb-3">
+                                        <Form.Label>Username</Form.Label>
+                                        <Form.Control type="text" value={username} disabled />
+                                    </Form.Group>
+                                </Col>
+                                <Col md={6}>
+                                    <Form.Group className="mb-3">
+                                        <Form.Label>Full Name</Form.Label>
+                                        <Form.Control type="text" value={name} onChange={(e) => setName(e.target.value)} required />
+                                    </Form.Group>
+                                </Col>
+                            </Row>
+                            <Row>
+                                <Col md={6}>
+                                    <Form.Group className="mb-3">
+                                        <Form.Label>Age</Form.Label>
+                                        <Form.Control type="number" value={age} onChange={(e) => setAge(e.target.value)} required />
+                                    </Form.Group>
+                                </Col>
+                                <Col md={6}>
+                                    <Form.Group className="mb-3">
+                                        <Form.Label>Gender</Form.Label>
+                                        <Form.Select value={gender} onChange={(e) => setGender(e.target.value)}>
+                                            <option value="male">Male</option>
+                                            <option value="female">Female</option>
+                                            <option value="other">Other</option>
+                                        </Form.Select>
+                                    </Form.Group>
+                                </Col>
+                            </Row>
+                            <Row>
+                                <Col md={6}>
+                                    <Form.Group className="mb-3">
+                                        <Form.Label>Height (cm)</Form.Label>
+                                        <Form.Control type="number" value={height} onChange={(e) => setHeight(e.target.value)} required />
+                                    </Form.Group>
+                                </Col>
+                                <Col md={6}>
+                                    <Form.Group className="mb-3">
+                                        <Form.Label>Weight (kg)</Form.Label>
+                                        <Form.Control type="number" value={weight} onChange={(e) => setWeight(e.target.value)} required />
+                                    </Form.Group>
+                                </Col>
+                            </Row>
                              <Button variant="success" type="submit" className="w-100" disabled={loading}>
                                  {loading ? 'Registering...' : 'Register & Login'}
                              </Button>
