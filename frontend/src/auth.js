@@ -24,7 +24,7 @@ async function checkUserAndLogin() {
             localStorage.setItem('user_data', JSON.stringify(data.user));
             
             // Redirect to your main app page (e.g., dashboard.html)
-            window.location.href = '/dashboard.html'; 
+            window.location.href = 'dashboard.html'; 
             
         } else if (response.status === 404) {
             // NOT FOUND: New user. Show the rest of the form.
@@ -66,7 +66,7 @@ async function registerNewUser() {
             const data = await response.json();
             localStorage.setItem('user_id', data.user_id);
             localStorage.setItem('user_data', JSON.stringify(data.user));
-            window.location.href = '/dashboard.html';
+            window.location.href = 'dashboard.html';
         } else if (response.status === 409) {
              showError("Username is already taken. Please go back and try another.");
         } else {
