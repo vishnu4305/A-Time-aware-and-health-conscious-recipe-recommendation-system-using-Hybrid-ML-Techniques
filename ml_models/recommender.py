@@ -48,13 +48,33 @@ def load_data():
     recipe_limit = int(os.environ.get('RECIPE_LIMIT', 500 if is_render else 10000))
     rating_limit = int(os.environ.get('RATING_LIMIT', 2000 if is_render else 50000))
     
-    # Load recipes
-    recipes = db.get_all_recipes(limit=recipe_limit)
-    _recipes_df = pd.DataFrame(recipes)
-    
     # Load ratings
     ratings = db.get_all_ratings(limit=rating_limit)
     _ratings_df = pd.DataFrame(ratings) if ratings else pd.DataFrame()
+    
+    # Extract rated recipe IDs to ensure perfect intersection
+    rated_recipe_ids = None
+    if not _ratings_df.empty:
+        rated_recipe_ids = _ratings_df['recipe_id'].unique().tolist()
+        
+    # Strict projection to save memory (drops massive text blocks like steps/descriptions)
+    projection = {
+        '_id': 1, 'name': 1, 'ingredients': 1, 'minutes': 1, 'n_ingredients': 1, 
+        'calories': 1, 'total_fat': 1, 'sugar': 1, 'sodium': 1, 'protein': 1, 
+        'saturated_fat': 1, 'carbohydrates': 1
+    }
+    
+    # Load ONLY recipes that have ratings
+    recipes = db.get_all_recipes(limit=recipe_limit, projection=projection, recipe_ids=rated_recipe_ids)
+    
+    # If we didn't hit the limit, fill the rest with random recipes
+    if len(recipes) < recipe_limit:
+        extra_limit = recipe_limit - len(recipes)
+        extra_recipes = db.get_random_recipes(limit=extra_limit, projection=projection)
+        existing_ids = {r['id'] for r in recipes}
+        recipes.extend([r for r in extra_recipes if r['id'] not in existing_ids])
+        
+    _recipes_df = pd.DataFrame(recipes)
     
     # Filter out ratings for recipes that don't exist
     if not _ratings_df.empty and not _recipes_df.empty:
@@ -113,7 +133,11 @@ def reload_ratings():
     
     # Count changed - reload ratings from database
     print(f"Ratings cache miss: {_cached_rating_count} -> {current_count} (reloading...)")
-    ratings = db.get_all_ratings(limit=50000)
+    
+    # Use strictly smaller limits on Render's 512MB free tier to prevent Out-Of-Memory crashes
+    is_render = os.environ.get('RENDER') is not None
+    rating_limit = int(os.environ.get('RATING_LIMIT', 2000 if is_render else 50000))
+    ratings = db.get_all_ratings(limit=rating_limit)
     _ratings_df = pd.DataFrame(ratings) if ratings else pd.DataFrame()
     
     # Filter out ratings for recipes that don't exist
@@ -150,14 +174,14 @@ def time_aware_collaborative_filtering(user_id, lambda_decay=2.5):
         return np.zeros(len(_recipes_df))
     
     # Get user's ratings
-    user_ratings = _ratings_df[_ratings_df['user_id'] == user_id]
+    user_ratings = _ratings_df[_ratings_df['user_id'].astype(str) == str(user_id)]
     if user_ratings.empty:
         return np.zeros(len(_recipes_df))
     
     # Pre-index ratings for fast lookup: (user_id, recipe_id) -> (rating, month_index)
     # Using vectorized operations instead of iterrows() for 100x speedup
     rating_lookup = {
-        (int(uid), int(rid)): (float(rating), int(month))
+        (str(uid), str(rid)): (float(rating), int(month))
         for uid, rid, rating, month in zip(
             _ratings_df['user_id'],
             _ratings_df['recipe_id'],
@@ -167,16 +191,18 @@ def time_aware_collaborative_filtering(user_id, lambda_decay=2.5):
     }
     
     # Get users who rated similar items
-    user_items = {int(r['recipe_id']): float(r['rating']) for _, r in user_ratings.iterrows()}
+    user_items = {str(r['recipe_id']): float(r['rating']) for _, r in user_ratings.iterrows()}
     user_mean = user_ratings['rating'].mean()
     
     # Find other users who rated at least one common item
     common_recipe_ids = set(user_items.keys())
-    potential_users = _ratings_df[_ratings_df['recipe_id'].isin(common_recipe_ids)]['user_id'].unique()
-    potential_users = [int(u) for u in potential_users if int(u) != user_id]
+    potential_users = _ratings_df[_ratings_df['recipe_id'].astype(str).isin(common_recipe_ids)]['user_id'].unique()
+    potential_users = [str(u) for u in potential_users if str(u) != str(user_id)]
     
     # Calculate mean ratings per user (only for relevant users)
-    mean_ratings = _ratings_df.groupby('user_id')['rating'].mean().to_dict()
+    mean_ratings_df = _ratings_df.copy()
+    mean_ratings_df['user_id_str'] = mean_ratings_df['user_id'].astype(str)
+    mean_ratings = mean_ratings_df.groupby('user_id_str')['rating'].mean().to_dict()
     
     # Compute time-aware similarities
     user_similarities = []
@@ -202,8 +228,8 @@ def time_aware_collaborative_filtering(user_id, lambda_decay=2.5):
         denom_other_sq = 0
         
         for item in common_items:
-            # Get timestamps using pre-indexed lookup
-            user_key = (user_id, item)
+            # Get timestamps using string pre-indexed lookup
+            user_key = (str(user_id), item)
             other_key = (other_user, item)
             
             if user_key not in rating_lookup or other_key not in rating_lookup:
@@ -217,7 +243,7 @@ def time_aware_collaborative_filtering(user_id, lambda_decay=2.5):
                  np.exp(-lambda_decay * (_max_month_index - t_uj))
             
             # Deviation from mean
-            dev_ui = user_items[item] - mean_ratings[user_id]
+            dev_ui = user_items[item] - mean_ratings.get(str(user_id), user_mean)
             dev_uj = other_items[item] - mean_ratings[other_user]
             
             # Accumulate
@@ -248,8 +274,8 @@ def time_aware_collaborative_filtering(user_id, lambda_decay=2.5):
     similar_user_ratings = {}
     for other_user, _ in top_similar_users:
         for recipe_id in range(len(_recipes_df)):
-            actual_recipe_id = int(_recipes_df.iloc[recipe_id]['id'])
-            key = (other_user, actual_recipe_id)
+            actual_recipe_id = str(_recipes_df.iloc[recipe_id]['id'])
+            key = (str(other_user), actual_recipe_id)
             if key in rating_lookup:
                 if actual_recipe_id not in similar_user_ratings:
                     similar_user_ratings[actual_recipe_id] = []
@@ -302,14 +328,14 @@ def content_based_filtering(user_id):
         return np.zeros(len(_recipes_df))
     
     # Get user's rated recipes
-    user_ratings = _ratings_df[_ratings_df['user_id'] == user_id]
+    user_ratings = _ratings_df[_ratings_df['user_id'].astype(str) == str(user_id)]
     
     if user_ratings.empty:
         return np.zeros(len(_recipes_df))
     
     # Get ingredients from rated recipes
-    rated_recipe_ids = user_ratings['recipe_id'].tolist()
-    rated_ingredients = _recipes_df[_recipes_df['id'].isin(rated_recipe_ids)]['ingredients'].tolist()
+    rated_recipe_ids = [str(rid) for rid in user_ratings['recipe_id'].tolist()]
+    rated_ingredients = _recipes_df[_recipes_df['id'].astype(str).isin(rated_recipe_ids)]['ingredients'].tolist()
     
     # Create user profile embedding
     user_embedding = encode_user_profile(rated_ingredients)
@@ -402,10 +428,10 @@ def get_recommendations(user_id, gamma=0.5, lambda_decay=2.5, top_n=10):
     final_scores = (1 - gamma) * preference_scores + gamma * health_scores
     
     # Get user's ratings to preserve top-rated favorites
-    user_ratings = _ratings_df[_ratings_df['user_id'] == user_id]
+    user_ratings = _ratings_df[_ratings_df['user_id'].astype(str) == str(user_id)]
     
     # Build recipe_id to index mapping
-    recipe_id_to_idx = {int(recipe_id): idx for idx, recipe_id in enumerate(_recipes_df['id'])}
+    recipe_id_to_idx = {str(recipe_id): idx for idx, recipe_id in enumerate(_recipes_df['id'])}
     
     recommendations = []
     
@@ -415,7 +441,7 @@ def get_recommendations(user_id, gamma=0.5, lambda_decay=2.5, top_n=10):
         top_rated = user_ratings.nlargest(3, 'rating')
         
         for _, rating_row in top_rated.iterrows():
-            recipe_id = int(rating_row['recipe_id'])
+            recipe_id = str(rating_row['recipe_id'])
             if recipe_id in recipe_id_to_idx:
                 idx = recipe_id_to_idx[recipe_id]
                 recipe = _recipes_df.iloc[idx].to_dict()
@@ -442,14 +468,14 @@ def get_recommendations(user_id, gamma=0.5, lambda_decay=2.5, top_n=10):
                 recommendations.append(recipe)
     
     # STEP 2: Fill remaining slots with best unrated recipes
-    rated_recipe_ids = set(user_ratings['recipe_id'].tolist()) if not user_ratings.empty else set()
+    rated_recipe_ids = set(str(rid) for rid in user_ratings['recipe_id'].tolist()) if not user_ratings.empty else set()
     remaining_slots = top_n - len(recommendations)
     
     if remaining_slots > 0:
         # Create scores array excluding already-rated recipes
         unrated_scores = final_scores.copy()
         for idx, recipe_id in enumerate(_recipes_df['id']):
-            if int(recipe_id) in rated_recipe_ids:
+            if str(recipe_id) in rated_recipe_ids:
                 unrated_scores[idx] = -1  # Mask out rated recipes
         
         # Get top unrated recipes
@@ -535,9 +561,8 @@ def get_meal_plan_recommendations(user_id, gamma=0.5, lambda_decay=2.5, recipes_
             'calorie_distribution': {}
         }
     
-    # Get top 50 recommendations using existing algorithm
-    # More recipes = better chance of finding suitable ones for each meal type
-    all_recommendations = get_recommendations(user_id, gamma, lambda_decay, top_n=50)
+    # Get top 30 recommendations using existing algorithm (Reduced to prevent timeouts)
+    all_recommendations = get_recommendations(user_id, gamma, lambda_decay, top_n=30)
     
     if not all_recommendations:
         return {

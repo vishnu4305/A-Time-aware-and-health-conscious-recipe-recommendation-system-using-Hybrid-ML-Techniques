@@ -112,10 +112,15 @@ def update_user(user_id, name, age, height, weight, gender, conditions, activity
     return {'affected_rows': 1}
 
 
-def get_all_recipes(limit=None):
-    """Get all recipes"""
+def get_all_recipes(limit=None, projection=None, recipe_ids=None):
+    """Get all recipes, optionally filtered by ID and projected"""
     database = get_db()
-    cursor = database.recipes.find()
+    query = {}
+    if recipe_ids:
+        parsed_ids = [parse_id(rid) for rid in recipe_ids]
+        query = {'_id': {'$in': parsed_ids}}
+        
+    cursor = database.recipes.find(query, projection)
     if limit:
         cursor = cursor.limit(limit)
     
@@ -187,20 +192,23 @@ def get_earliest_rating_timestamp():
     return None
 
 
-def get_random_recipes(limit=10):
+def get_random_recipes(limit=10, projection=None):
     """Get a random selection of recipes for cold start fallbacks"""
     database = get_db()
     pipeline = [{'$match': {'ingredients': {'$ne': None}}}, {'$sample': {'size': limit}}]
+    if projection:
+        pipeline.append({'$project': projection})
+    pipeline.append({'$sample': {'size': limit}})
     recipes = list(database.recipes.aggregate(pipeline))
     for r in recipes:
         r['id'] = str(r.pop('_id', r.get('id')))
     return recipes
 
 
-def get_recipes_with_offset(skip_amount, limit_amount):
+def get_recipes_with_offset(skip_amount, limit_amount, projection=None):
     """Get recipes with pagination/offset for meal plan fallbacks"""
     database = get_db()
-    recipes = list(database.recipes.find().skip(skip_amount).limit(limit_amount))
+    recipes = list(database.recipes.find({}, projection).skip(skip_amount).limit(limit_amount))
     for r in recipes:
         r['id'] = str(r.pop('_id', r.get('id')))
     return recipes

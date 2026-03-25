@@ -273,7 +273,12 @@ def recommend():
         # COLD START FALLBACK: If ML model returns empty (for new users), pull real recipes from the downloaded DB
         if not recommendations or len(recommendations) == 0:
             print("ML Model returned 0 recipes (Cold Start). Pulling real recipes from DB directly...")
-            fallback_recs = db.get_random_recipes(top_n)
+            projection = {
+                '_id': 1, 'name': 1, 'ingredients': 1, 'minutes': 1, 'n_ingredients': 1, 
+                'calories': 1, 'total_fat': 1, 'sugar': 1, 'sodium': 1, 'protein': 1, 
+                'saturated_fat': 1, 'carbohydrates': 1
+            }
+            fallback_recs = db.get_random_recipes(top_n, projection=projection)
             if fallback_recs:
                 recommendations = fallback_recs
 
@@ -334,11 +339,16 @@ def recommend_meal_plan():
         # COLD START FALLBACK FOR MEAL PLAN:
         if not meal_plan or all(not meals or len(meals) == 0 for meals in meal_plan.values()):
             print("ML Model returned empty meal plan. Pulling real recipes from DB directly...")
+            projection = {
+                '_id': 1, 'name': 1, 'ingredients': 1, 'minutes': 1, 'n_ingredients': 1, 
+                'calories': 1, 'total_fat': 1, 'sugar': 1, 'sodium': 1, 'protein': 1, 
+                'saturated_fat': 1, 'carbohydrates': 1
+            }
             meal_plan = {
-                "breakfast": db.get_recipes_with_offset(0, recipes_per_meal) or [],
-                "lunch": db.get_recipes_with_offset(10, recipes_per_meal) or [],
-                "dinner": db.get_recipes_with_offset(20, recipes_per_meal) or [],
-                "snacks": db.get_recipes_with_offset(30, recipes_per_meal) or []
+                "breakfast": db.get_recipes_with_offset(0, recipes_per_meal, projection) or [],
+                "lunch": db.get_recipes_with_offset(10, recipes_per_meal, projection) or [],
+                "dinner": db.get_recipes_with_offset(20, recipes_per_meal, projection) or [],
+                "snacks": db.get_recipes_with_offset(30, recipes_per_meal, projection) or []
             }
 
         return jsonify(meal_plan), 200
