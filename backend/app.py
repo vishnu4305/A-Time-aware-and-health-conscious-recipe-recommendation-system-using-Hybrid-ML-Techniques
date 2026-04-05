@@ -279,8 +279,24 @@ def recommend():
                 'saturated_fat': 1, 'carbohydrates': 1
             }
             fallback_recs = db.get_random_recipes(top_n, projection=projection)
-            if fallback_recs:
+            
+            if fallback_recs and len(fallback_recs) > 0:
+                for rec in fallback_recs:
+                    rec['final_score'] = 0.5
+                    rec['preference_score'] = 0.5
+                    rec['health_score'] = 0.5
+                    rec['explanation'] = "Cold Start: Popular Recipe Fallback"
                 recommendations = fallback_recs
+            else:
+                # MONGODB IS EMPTY - Prevent frontend crash with dummy data
+                recommendations = [{
+                    'id': 'empty_db_1',
+                    'name': '⚠️ MongoDB is Empty',
+                    'ingredients': 'Please upload the Kaggle dataset to your MongoDB Atlas cluster.',
+                    'minutes': 0, 'calories': 0, 'protein': 0, 'total_fat': 0, 'carbohydrates': 0,
+                    'final_score': 0.5, 'preference_score': 0.5, 'health_score': 0.5,
+                    'explanation': 'Database Missing Data'
+                }]
 
         return jsonify({
             'user_id': user_id,
@@ -314,6 +330,7 @@ def recommend_meal_plan():
         user_id = data.get('user_id')
         gamma = float(data.get('gamma', 0.5))
         lambda_decay = float(data.get('lambda_decay', 2.5))
+
         recipes_per_meal = int(data.get('recipes_per_meal', 3))
         
         # Validate user_id
@@ -337,18 +354,46 @@ def recommend_meal_plan():
         meal_plan = get_meal_plan_recommendations(user_id, gamma, lambda_decay, recipes_per_meal)
         
         # COLD START FALLBACK FOR MEAL PLAN:
-        if not meal_plan or all(not meals or len(meals) == 0 for meals in meal_plan.values()):
+        is_empty = True
+        if meal_plan and 'meal_plan' in meal_plan:
+            actual_meals = meal_plan['meal_plan']
+            if any(len(meal_data.get('recipes', [])) > 0 for meal_data in actual_meals.values()):
+                is_empty = False
+                
+        if is_empty:
             print("ML Model returned empty meal plan. Pulling real recipes from DB directly...")
             projection = {
                 '_id': 1, 'name': 1, 'ingredients': 1, 'minutes': 1, 'n_ingredients': 1, 
                 'calories': 1, 'total_fat': 1, 'sugar': 1, 'sodium': 1, 'protein': 1, 
                 'saturated_fat': 1, 'carbohydrates': 1
             }
+            
+            def get_fallback_meal(offset, target, meal_type):
+                recs = db.get_recipes_with_offset(offset, recipes_per_meal, projection) or []
+                if not recs:
+                    # MONGODB IS EMPTY - Prevent frontend crash
+                    recs = [{
+                        'id': f'empty_{meal_type}',
+                        'name': f'⚠️ Empty MongoDB',
+                        'ingredients': 'No data found in MongoDB. Please upload the dataset.',
+                        'minutes': 0, 'calories': target, 'protein': 0, 'total_fat': 0, 'carbohydrates': 0,
+                        'final_score': 0.5, 'calorie_fitness': 0.8
+                    }]
+                else:
+                    for r in recs:
+                        r['final_score'] = 0.5
+                        r['calorie_fitness'] = 0.8
+                return {"target_calories": target, "recipes": recs, "count": len(recs)}
+
             meal_plan = {
-                "breakfast": db.get_recipes_with_offset(0, recipes_per_meal, projection) or [],
-                "lunch": db.get_recipes_with_offset(10, recipes_per_meal, projection) or [],
-                "dinner": db.get_recipes_with_offset(20, recipes_per_meal, projection) or [],
-                "snacks": db.get_recipes_with_offset(30, recipes_per_meal, projection) or []
+                'meal_plan': {
+                    "breakfast": get_fallback_meal(0, 400, "breakfast"),
+                    "lunch": get_fallback_meal(10, 600, "lunch"),
+                    "snacks": get_fallback_meal(20, 200, "snacks"),
+                    "dinner": get_fallback_meal(30, 700, "dinner")
+                },
+                'daily_calories': 1900,
+                'calorie_distribution': {'breakfast': 400, 'lunch': 600, 'snacks': 200, 'dinner': 700}
             }
 
         return jsonify(meal_plan), 200
