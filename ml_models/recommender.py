@@ -156,6 +156,13 @@ def reload_ratings():
     print(f"Ratings reloaded: {_cached_rating_count} total ratings")
 
 
+def force_reload_ratings():
+    """Force the cache to invalidate and reload ratings on next request"""
+    global _cached_rating_count
+    # Setting to -1 ensures the next check against db.get_rating_count() fails, triggering a reload
+    _cached_rating_count = -1
+
+
 def time_aware_collaborative_filtering(user_id, lambda_decay=2.5):
     """
     Time-Aware Collaborative Filtering based on Rostami et al. (2023)

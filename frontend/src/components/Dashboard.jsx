@@ -74,8 +74,8 @@ function Dashboard({ user }) {
   };
 
   const handleRatingSubmitted = () => {
-    // Optionally refresh recommendations after rating
     setSelectedRecipe(null);
+    handleGetRecommendations(); // Automatically fetch fresh recommendations
   };
 
   const handleViewModeChange = (mode) => {

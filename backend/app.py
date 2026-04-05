@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 import database as db
-from ml_models.recommender import get_recommendations, get_meal_plan_recommendations, load_data
+from ml_models.recommender import get_recommendations, get_meal_plan_recommendations, load_data, force_reload_ratings
 
 load_dotenv()
 
@@ -458,6 +458,9 @@ def rate_recipe():
         result = db.add_rating(user_id, recipe_id, rating, timestamp, month_index)
         
         if result:
+            # Invalidate ML model cache so it uses the new/updated rating on next request
+            force_reload_ratings()
+            
             return jsonify({
                 'message': 'Rating saved successfully',
                 'user_id': user_id,
