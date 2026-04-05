@@ -43,8 +43,16 @@ def load_data():
     """
     global _recipes_df, _ratings_df, _embeddings, _max_month_index, _cached_rating_count
     
+    # Detect if running on Render Free Tier to prevent Out-Of-Memory (OOM) crashes
+    is_render = os.environ.get('RENDER') == 'true'
+    limit_kwargs = {}
+    if is_render:
+        print("⚠️ RENDER FREE TIER DETECTED: Enabling aggressive memory-saving mode...")
+        limit_kwargs = {'limit': 3000}
+
     # Load ratings
-    ratings = db.get_all_ratings()
+    print("⏳ Step 1/3: Fetching ratings from database... (This usually takes the longest)")
+    ratings = db.get_all_ratings(**limit_kwargs)
     _ratings_df = pd.DataFrame(ratings) if ratings else pd.DataFrame()
     
     # Extract rated recipe IDs to ensure perfect intersection
@@ -60,7 +68,9 @@ def load_data():
     }
     
     # Load ONLY recipes that have ratings
-    recipes = db.get_all_recipes(projection=projection, recipe_ids=rated_recipe_ids)
+    print("⏳ Step 2/3: Fetching recipes from database...")
+    recipe_limit = limit_kwargs.get('limit')
+    recipes = db.get_all_recipes(limit=recipe_limit, projection=projection, recipe_ids=rated_recipe_ids)
         
     _recipes_df = pd.DataFrame(recipes)
     
@@ -82,13 +92,19 @@ def load_data():
     # Initialize cached rating count
     _cached_rating_count = len(_ratings_df)
     
+    print("⏳ Step 3/3: Preparing Machine Learning AI embeddings...")
     # Load or compute embeddings
     embeddings_path = os.path.join(os.path.dirname(__file__), 'embeddings', 'recipe_embeddings.npy')
     os.makedirs(os.path.dirname(embeddings_path), exist_ok=True)
     
-    gdrive_id = os.environ.get('GDRIVE_EMBEDDINGS_ID', '1xoirnEQAGr4UxMgnq9hvcLGqmWq3WTCS')
-    if not os.path.exists(embeddings_path) and gdrive_id:
-        download_from_gdrive(gdrive_id, embeddings_path)
+    if is_render:
+        # On Render Free Tier, skip the massive 350MB file download and compute on-the-fly
+        print("Render mode: Skipping massive file download to save memory.")
+        embeddings_path = None
+    else:
+        gdrive_id = os.environ.get('GDRIVE_EMBEDDINGS_ID', '1xoirnEQAGr4UxMgnq9hvcLGqmWq3WTCS')
+        if not os.path.exists(embeddings_path) and gdrive_id:
+            download_from_gdrive(gdrive_id, embeddings_path)
     
     if not _recipes_df.empty:
         ingredients_list = _recipes_df['ingredients'].tolist()
@@ -577,8 +593,8 @@ def get_meal_plan_recommendations(user_id, gamma=0.5, lambda_decay=2.5, recipes_
 
 
 # Initialize data on module import
-try:
-    load_data()
-except Exception as e:
-    print(f"Warning: Could not load initial data: {e}")
-    print("Data will be loaded on first recommendation request")
+# try:
+#     load_data()
+# except Exception as e:
+#     print(f"Warning: Could not load initial data: {e}")
+#     print("Data will be loaded on first recommendation request")

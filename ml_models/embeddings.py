@@ -2,7 +2,6 @@
 Ingredient embeddings using Sentence-Transformers
 Pre-trained model for semantic similarity of ingredients
 """
-from sentence_transformers import SentenceTransformer
 import numpy as np
 import os
 import pickle
@@ -24,6 +23,7 @@ def get_model():
     
     if _model is None:
         print("Loading Sentence-Transformer model (all-MiniLM-L6-v2)...")
+        from sentence_transformers import SentenceTransformer
         _model = SentenceTransformer('all-MiniLM-L6-v2')
         print("Model loaded successfully!")
     
