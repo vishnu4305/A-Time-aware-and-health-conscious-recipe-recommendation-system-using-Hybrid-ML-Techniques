@@ -2,7 +2,26 @@ import React, { useState } from 'react';
 import { Card, Button, Badge, Alert, Row, Col } from 'react-bootstrap';
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const RENDER_URL = process.env.REACT_APP_API_URL || 'https://recipe-recommender-api-57hq.onrender.com';
+const LOCAL_URL = 'http://localhost:5000';
+let workingUrl = RENDER_URL;
+
+// Helper to automatically fallback to localhost if Render is asleep or fails
+const safeAxiosPost = async (endpoint, payload) => {
+  try {
+    return await axios.post(`${workingUrl}${endpoint}`, payload);
+  } catch (err) {
+    const isNetworkError = !err.response || err.code === 'ERR_NETWORK';
+    const isServerError = err.response && err.response.status >= 500;
+    
+    if ((isNetworkError || isServerError) && workingUrl !== LOCAL_URL) {
+      console.warn(`Cloud backend offline. Falling back to local server at ${LOCAL_URL}...`);
+      workingUrl = LOCAL_URL;
+      return await axios.post(`${workingUrl}${endpoint}`, payload);
+    }
+    throw err;
+  }
+};
 
 function RecipeDetail({ recipe, user, onClose, onRatingSubmitted }) {
   const [rating, setRating] = useState(0);
@@ -20,7 +39,7 @@ function RecipeDetail({ recipe, user, onClose, onRatingSubmitted }) {
     setSubmitting(true);
 
     try {
-      await axios.post(`${API_URL}/rate`, {
+      await safeAxiosPost('/rate', {
         user_id: user.id,
         recipe_id: recipe.id,
         rating: rating

@@ -2,7 +2,26 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Button, Alert, Row, Col, Badge, Form } from 'react-bootstrap';
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const RENDER_URL = process.env.REACT_APP_API_URL || 'https://recipe-recommender-api-57hq.onrender.com';
+const LOCAL_URL = 'http://localhost:5000';
+let workingUrl = RENDER_URL;
+
+// Helper for GET and PUT requests to automatically fallback to localhost
+const safeAxios = async (method, endpoint, payload = null) => {
+  try {
+    return await axios({ method, url: `${workingUrl}${endpoint}`, data: payload });
+  } catch (err) {
+    const isNetworkError = !err.response || err.code === 'ERR_NETWORK';
+    const isServerError = err.response && err.response.status >= 500;
+    
+    if ((isNetworkError || isServerError) && workingUrl !== LOCAL_URL) {
+      console.warn(`Cloud backend offline. Falling back to local server at ${LOCAL_URL}...`);
+      workingUrl = LOCAL_URL;
+      return await axios({ method, url: `${workingUrl}${endpoint}`, data: payload });
+    }
+    throw err;
+  }
+};
 
 function ProfilePage({ user, onUserChange }) {
   const [userDetails, setUserDetails] = useState(user); // Start with user prop data
@@ -15,7 +34,7 @@ function ProfilePage({ user, onUserChange }) {
   const fetchUserDetails = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}/user/${user.id}`);
+      const response = await safeAxios('get', `/user/${user.id}`);
       setUserDetails(response.data);
       setError('');
     } catch (err) {
@@ -93,7 +112,7 @@ function ProfilePage({ user, onUserChange }) {
       setError('');
       setUpdateSuccess('');
       const userId = user.id || user._id;
-      const response = await axios.put(`${API_URL}/user/update/${userId}`, {
+      const response = await safeAxios('put', `/user/update/${userId}`, {
         name: userDetails.name, // Name remains unchanged
         age: parseInt(editForm.age),
         height: parseFloat(editForm.height),

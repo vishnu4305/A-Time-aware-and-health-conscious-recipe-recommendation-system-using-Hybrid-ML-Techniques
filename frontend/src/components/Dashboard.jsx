@@ -5,7 +5,26 @@ import RecipeCard from './RecipeCard';
 import RecipeDetail from './RecipeDetail';
 import MealPlanView from './MealPlanView';
 
-const API_BASE_URL = 'https://recipe-recommender-api-57hq.onrender.com';
+const RENDER_URL = process.env.REACT_APP_API_URL || 'https://recipe-recommender-api-57hq.onrender.com';
+const LOCAL_URL = 'http://localhost:5000';
+let workingUrl = RENDER_URL;
+
+// Helper to automatically fallback to localhost if Render is asleep or fails
+const safeAxiosPost = async (endpoint, payload) => {
+  try {
+    return await axios.post(`${workingUrl}${endpoint}`, payload);
+  } catch (err) {
+    const isNetworkError = !err.response || err.code === 'ERR_NETWORK';
+    const isServerError = err.response && err.response.status >= 500;
+    
+    if ((isNetworkError || isServerError) && workingUrl !== LOCAL_URL) {
+      console.warn(`Cloud backend offline or timed out. Falling back to local server at ${LOCAL_URL}...`);
+      workingUrl = LOCAL_URL;
+      return await axios.post(`${workingUrl}${endpoint}`, payload);
+    }
+    throw err;
+  }
+};
 
 function Dashboard({ user }) {
   const [gamma, setGamma] = useState(0.5);
@@ -37,7 +56,7 @@ function Dashboard({ user }) {
     try {
       if (viewMode === 'meal-plan') {
         // Get meal plan
-        const response = await axios.post(`${API_BASE_URL}/recommend/meal-plan`, {
+        const response = await safeAxiosPost('/recommend/meal-plan', {
           user_id: user._id || user.id,
           gamma: gamma,
           lambda_decay: lambda,
@@ -48,7 +67,7 @@ function Dashboard({ user }) {
         setRecommendations([]);
       } else {
         // Get normal recommendations
-        const response = await axios.post(`${API_BASE_URL}/recommend`, {
+        const response = await safeAxiosPost('/recommend', {
           user_id: user._id || user.id,
           gamma: gamma,
           lambda_decay: lambda,

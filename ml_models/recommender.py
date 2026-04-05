@@ -12,6 +12,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'backend'))
 import database as db
 
+from .embeddings import get_or_compute_embeddings, encode_user_profile, compute_similarity
 from .health_rules import calculate_health_score, get_health_explanation
 
 
@@ -42,13 +43,8 @@ def load_data():
     """
     global _recipes_df, _ratings_df, _embeddings, _max_month_index, _cached_rating_count
     
-    # Use strictly smaller limits on Render's 512MB free tier to prevent Out-Of-Memory crashes
-    is_render = os.environ.get('RENDER') is not None
-    recipe_limit = int(os.environ.get('RECIPE_LIMIT', 500 if is_render else 10000))
-    rating_limit = int(os.environ.get('RATING_LIMIT', 2000 if is_render else 50000))
-    
     # Load ratings
-    ratings = db.get_all_ratings(limit=rating_limit)
+    ratings = db.get_all_ratings()
     _ratings_df = pd.DataFrame(ratings) if ratings else pd.DataFrame()
     
     # Extract rated recipe IDs to ensure perfect intersection
@@ -64,14 +60,7 @@ def load_data():
     }
     
     # Load ONLY recipes that have ratings
-    recipes = db.get_all_recipes(limit=recipe_limit, projection=projection, recipe_ids=rated_recipe_ids)
-    
-    # If we didn't hit the limit, fill the rest with random recipes
-    if len(recipes) < recipe_limit:
-        extra_limit = recipe_limit - len(recipes)
-        extra_recipes = db.get_random_recipes(limit=extra_limit, projection=projection)
-        existing_ids = {r['id'] for r in recipes}
-        recipes.extend([r for r in extra_recipes if r['id'] not in existing_ids])
+    recipes = db.get_all_recipes(projection=projection, recipe_ids=rated_recipe_ids)
         
     _recipes_df = pd.DataFrame(recipes)
     
@@ -97,20 +86,13 @@ def load_data():
     embeddings_path = os.path.join(os.path.dirname(__file__), 'embeddings', 'recipe_embeddings.npy')
     os.makedirs(os.path.dirname(embeddings_path), exist_ok=True)
     
-    # Download from Google Drive only if NOT on Render free tier.
-    # The 356MB file is too large for 512MB RAM and causes an instant OOM crash.
     gdrive_id = os.environ.get('GDRIVE_EMBEDDINGS_ID', '1xoirnEQAGr4UxMgnq9hvcLGqmWq3WTCS')
-    if not is_render and not os.path.exists(embeddings_path) and gdrive_id:
+    if not os.path.exists(embeddings_path) and gdrive_id:
         download_from_gdrive(gdrive_id, embeddings_path)
     
     if not _recipes_df.empty:
         ingredients_list = _recipes_df['ingredients'].tolist()
-        if is_render:
-            # Skip heavy PyTorch embeddings on Render Free Tier to prevent OOM
-            _embeddings = None
-        else:
-            from .embeddings import get_or_compute_embeddings
-            _embeddings = get_or_compute_embeddings(ingredients_list, embeddings_path)
+        _embeddings = get_or_compute_embeddings(ingredients_list, embeddings_path)
     
     print(f"Data loaded: {len(_recipes_df)} recipes, {len(_ratings_df)} ratings")
 
@@ -134,10 +116,7 @@ def reload_ratings():
     # Count changed - reload ratings from database
     print(f"Ratings cache miss: {_cached_rating_count} -> {current_count} (reloading...)")
     
-    # Use strictly smaller limits on Render's 512MB free tier to prevent Out-Of-Memory crashes
-    is_render = os.environ.get('RENDER') is not None
-    rating_limit = int(os.environ.get('RATING_LIMIT', 2000 if is_render else 50000))
-    ratings = db.get_all_ratings(limit=rating_limit)
+    ratings = db.get_all_ratings()
     _ratings_df = pd.DataFrame(ratings) if ratings else pd.DataFrame()
     
     # Filter out ratings for recipes that don't exist
@@ -214,8 +193,8 @@ def time_aware_collaborative_filtering(user_id, lambda_decay=2.5):
     # Compute time-aware similarities
     user_similarities = []
     
-    # Reduced from 500 to 50 for 10x speedup (still finds good neighbors)
-    for other_user in potential_users[:50]:
+    # Deep search for similar users
+    for other_user in potential_users[:500]:
         # Get other user's ratings using pre-indexed lookup
         other_items = {}
         for recipe_id in common_recipe_ids:
@@ -343,8 +322,6 @@ def content_based_filtering(user_id):
     # Get ingredients from rated recipes
     rated_recipe_ids = [str(rid) for rid in user_ratings['recipe_id'].tolist()]
     rated_ingredients = _recipes_df[_recipes_df['id'].astype(str).isin(rated_recipe_ids)]['ingredients'].tolist()
-    
-    from .embeddings import encode_user_profile, compute_similarity
     
     # Create user profile embedding
     user_embedding = encode_user_profile(rated_ingredients)
@@ -570,8 +547,8 @@ def get_meal_plan_recommendations(user_id, gamma=0.5, lambda_decay=2.5, recipes_
             'calorie_distribution': {}
         }
     
-    # Get top 30 recommendations using existing algorithm (Reduced to prevent timeouts)
-    all_recommendations = get_recommendations(user_id, gamma, lambda_decay, top_n=30)
+    # Get top 50 recommendations using existing algorithm for better meal plan variety
+    all_recommendations = get_recommendations(user_id, gamma, lambda_decay, top_n=50)
     
     if not all_recommendations:
         return {
@@ -601,8 +578,7 @@ def get_meal_plan_recommendations(user_id, gamma=0.5, lambda_decay=2.5, recipes_
 
 # Initialize data on module import
 try:
-    # Disabled eager loading to prevent Render timeout/OOM on startup
-    pass
+    load_data()
 except Exception as e:
     print(f"Warning: Could not load initial data: {e}")
     print("Data will be loaded on first recommendation request")

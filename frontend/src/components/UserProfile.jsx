@@ -1,7 +1,29 @@
 import React, { useState } from 'react';
 import { Card, Form, Button, Alert, Row, Col, Container } from 'react-bootstrap';
 
-const API_BASE_URL = 'https://recipe-recommender-api-57hq.onrender.com';
+const RENDER_URL = process.env.REACT_APP_API_URL || 'https://recipe-recommender-api-57hq.onrender.com';
+const LOCAL_URL = 'http://localhost:5000';
+let workingUrl = RENDER_URL;
+
+// Helper to automatically fallback to localhost if Render is asleep or fails
+const safeFetch = async (endpoint, options) => {
+    try {
+        const response = await fetch(`${workingUrl}${endpoint}`, options);
+        if (response.status >= 500 && workingUrl !== LOCAL_URL) {
+            console.warn(`Cloud backend returned ${response.status}. Falling back to ${LOCAL_URL}...`);
+            workingUrl = LOCAL_URL;
+            return await fetch(`${workingUrl}${endpoint}`, options);
+        }
+        return response;
+    } catch (err) {
+        if (workingUrl !== LOCAL_URL) {
+            console.warn(`Cloud backend offline. Falling back to local server at ${LOCAL_URL}...`);
+            workingUrl = LOCAL_URL;
+            return await fetch(`${workingUrl}${endpoint}`, options);
+        }
+        throw err;
+    }
+};
 
 function UserProfile({ onUserCreated }) {
     const [username, setUsername] = useState('');
@@ -33,7 +55,7 @@ function UserProfile({ onUserCreated }) {
         setLoading(true);
 
         try {
-            const response = await fetch(`${API_BASE_URL}/user/login`, {
+            const response = await safeFetch('/user/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username })
@@ -73,7 +95,7 @@ function UserProfile({ onUserCreated }) {
         };
 
         try {
-            const response = await fetch(`${API_BASE_URL}/user/create`, {
+            const response = await safeFetch('/user/create', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(userData)
