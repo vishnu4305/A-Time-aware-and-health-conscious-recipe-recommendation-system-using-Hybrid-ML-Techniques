@@ -60,8 +60,8 @@ def check_who_macros(recipe):
         Score between 0 and 1 (1 = perfect adherence)
     """
     protein = recipe.get('protein', 0)
-    fat = recipe.get('fat', 0)
-    carbs = recipe.get('carbs', 0)
+    fat = recipe.get('total_fat', recipe.get('fat', 0))
+    carbs = recipe.get('carbohydrates', recipe.get('carbs', 0))
     
     # Calculate total macronutrients
     total_macros = protein + fat + carbs
