@@ -12,11 +12,25 @@ A multi-user, cloud-deployed web application that provides personalized recipe r
 - **Persistent Sessions**: React-based seamless authentication flow.
 - **Cloud Optimized**: Dynamic memory scaling to prevent Out-Of-Memory (OOM) crashes on Free Tier cloud hosts.
 
-## 💻 Tech Stack
+## 🔄 How It Works (Step-by-Step Workflow)
+
+1. **User Profiling**: Users register by entering their physical metrics (Age, Height, Weight, Gender, Activity Level) and tagging any health conditions (e.g., Diabetes, Obesity).
+2. **Health Baseline Calculation**: The backend calculates the user's Basal Metabolic Rate (BMR) and Total Daily Energy Expenditure (TDEE). If the user is flagged for obesity management, it enforces a strict 500 kcal daily deficit.
+3. **Taste Preference Learning**: As the user interacts with the system, the AI builds a preference profile using two methods:
+   - *Content-Based Filtering*: HuggingFace Sentence-Transformers read the actual ingredients to learn flavor profiles the user enjoys.
+   - *Time-Aware Collaborative Filtering*: The algorithm finds similar users but applies a mathematical decay (Lambda λ) to give higher weight to *recently* rated items, adapting to changing tastes over time.
+4. **Nutritional Health Scoring**: Every recipe in the database is graded against World Health Organization (WHO) macro guidelines (10-15% Protein, 15-30% Fat, 55-75% Carbs). It also penalizes recipes if they violate user conditions (e.g., high glycemic load or >10g sugar for diabetics).
+5. **Hybrid Recommendation Generation**: The engine calculates a Final Score by fusing the Taste prediction and the Health score based on the user's Gamma (γ) slider.
+   - `γ = 0.0`: Pure comfort food (Taste only).
+   - `γ = 0.5`: Balanced recommendation.
+   - `γ = 1.0`: Pure strict diet (Health only).
+6. **Daily Meal Planning**: To build a meal plan, the system uses NLP to semantically classify the highest-scoring recipes into Breakfast, Lunch, Snacks, and Dinner, ensuring the combination perfectly hits the user's custom calorie distribution for the day.
+
+## � Tech Stack
 
 - **Frontend**: React.js, React Router, React Bootstrap (Hosted on **Vercel**)
 - **Backend**: Python Flask, Gunicorn (Hosted on **Render**)
-- **Database**: MongoDB Atlas (Cloud NoSQL Database)
+- **Database**: MongoDB Atlas (Cloud) / SQLite (Offline Local Support)
 - **Machine Learning**: PyTorch, Sentence-Transformers, scikit-learn, Pandas, NumPy
 - **Data Storage**: Google Drive (for hosting the massive 356MB pre-computed embeddings file)
 
@@ -24,6 +38,7 @@ A multi-user, cloud-deployed web application that provides personalized recipe r
 
 ```
 Time-aware/
+├── data/                    # Kaggle Dataset & preprocessing scripts
 ├── frontend/                # React application (Deployed to Vercel)
 │   ├── src/
 │   │   ├── components/      # UserProfile, Dashboard, ProfilePage

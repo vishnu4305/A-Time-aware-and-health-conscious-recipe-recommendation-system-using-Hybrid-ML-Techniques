@@ -48,7 +48,7 @@ def load_data():
     limit_kwargs = {}
     if is_render:
         print("⚠️ RENDER FREE TIER DETECTED: Enabling aggressive memory-saving mode...")
-        limit_kwargs = {'limit': 3000}
+        limit_kwargs = {'limit': 400}  # Reduced from 3000 to prevent OOM on 512MB RAM servers
 
     # Load ratings
     print("⏳ Step 1/3: Fetching ratings from database... (This usually takes the longest)")
@@ -76,8 +76,9 @@ def load_data():
     
     # Filter out ratings for recipes that don't exist
     if not _ratings_df.empty and not _recipes_df.empty:
-        valid_recipe_ids = set(_recipes_df['id'].tolist())
+        valid_recipe_ids = set(_recipes_df['id'].astype(str).tolist())
         original_count = len(_ratings_df)
+        _ratings_df['recipe_id'] = _ratings_df['recipe_id'].astype(str)
         _ratings_df = _ratings_df[_ratings_df['recipe_id'].isin(valid_recipe_ids)]
         filtered_count = original_count - len(_ratings_df)
         if filtered_count > 0:
@@ -137,7 +138,8 @@ def reload_ratings():
     
     # Filter out ratings for recipes that don't exist
     if not _ratings_df.empty and _recipes_df is not None and not _recipes_df.empty:
-        valid_recipe_ids = set(_recipes_df['id'].tolist())
+        valid_recipe_ids = set(_recipes_df['id'].astype(str).tolist())
+        _ratings_df['recipe_id'] = _ratings_df['recipe_id'].astype(str)
         _ratings_df = _ratings_df[_ratings_df['recipe_id'].isin(valid_recipe_ids)]
     
     # Recalculate max month_index
