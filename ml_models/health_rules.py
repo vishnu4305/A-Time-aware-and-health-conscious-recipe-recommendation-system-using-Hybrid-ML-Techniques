@@ -59,15 +59,20 @@ def check_who_macros(recipe):
     Returns:
         Score between 0 and 1 (1 = perfect adherence)
     """
-    protein = recipe.get('protein', 0)
-    fat = recipe.get('total_fat', recipe.get('fat', 0))
-    carbs = recipe.get('carbohydrates', recipe.get('carbs', 0))
+    try:
+        protein = float(recipe.get('protein', 0))
+        fat = float(recipe.get('total_fat', recipe.get('fat', 0)))
+        carbs = float(recipe.get('carbohydrates', recipe.get('carbs', 0)))
+    except (ValueError, TypeError):
+        protein = 0.0
+        fat = 0.0
+        carbs = 0.0
     
     # Calculate total macronutrients
     total_macros = protein + fat + carbs
     
     if total_macros == 0:
-        return 0
+        return 0.5  # Neutral score instead of 0 penalty for recipes missing data
     
     # Calculate percentages
     protein_pct = protein / total_macros
@@ -120,7 +125,10 @@ def score_obesity(recipe, user):
     daily_cal = calculate_daily_calories(user)
     deficit_cal = daily_cal - 500  # 500 kcal deficit for weight loss
     
-    recipe_cal = recipe.get('calories', 0)
+    try:
+        recipe_cal = float(recipe.get('calories', 0))
+    except (ValueError, TypeError):
+        recipe_cal = 0.0
     
     # Penalty if recipe exceeds 30% of daily allowance
     max_meal_cal = deficit_cal * 0.30
@@ -149,8 +157,12 @@ def score_diabetes(recipe, user):
     Returns:
         Score adjustment (-0.5 to 0)
     """
-    sugar = recipe.get('sugar', 0)
-    gl = recipe.get('gl', 0)
+    try:
+        sugar = float(recipe.get('sugar', 0))
+        gl = float(recipe.get('gl', 0))
+    except (ValueError, TypeError):
+        sugar = 0.0
+        gl = 0.0
     
     penalty = 0
     
