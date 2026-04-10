@@ -7,6 +7,7 @@ import os
 import numpy as np
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
+import gc
 
 # Add backend to path for database access
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'backend'))
@@ -48,7 +49,13 @@ def load_data():
     limit_kwargs = {}
     if is_render:
         print("⚠️ RENDER FREE TIER DETECTED: Enabling aggressive memory-saving mode...")
-        limit_kwargs = {'limit': 400}  # Reduced from 3000 to prevent OOM on 512MB RAM servers
+        limit_kwargs = {'limit': 150}  # Reduced further to prevent OOM on 512MB RAM servers
+        try:
+            import torch
+            # Limit PyTorch to a single thread to save memory
+            torch.set_num_threads(1)
+        except ImportError:
+            pass
 
     # Load ratings
     print("⏳ Step 1/3: Fetching ratings from database... (This usually takes the longest)")
@@ -95,6 +102,9 @@ def load_data():
     
     print("⏳ Step 3/3: Preparing Machine Learning AI embeddings...")
     # Load or compute embeddings
+    
+    gc.collect()  # Force garbage collection to free up RAM before loading ML models
+    
     embeddings_path = os.path.join(os.path.dirname(__file__), 'embeddings', 'recipe_embeddings.npy')
     os.makedirs(os.path.dirname(embeddings_path), exist_ok=True)
     
@@ -110,6 +120,8 @@ def load_data():
     if not _recipes_df.empty:
         ingredients_list = _recipes_df['ingredients'].tolist()
         _embeddings = get_or_compute_embeddings(ingredients_list, embeddings_path)
+        
+    gc.collect()
     
     print(f"Data loaded: {len(_recipes_df)} recipes, {len(_ratings_df)} ratings")
 
