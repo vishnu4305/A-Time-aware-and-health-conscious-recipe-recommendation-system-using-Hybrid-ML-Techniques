@@ -349,15 +349,20 @@ def content_based_filtering(user_id):
     if user_ratings.empty:
         return np.zeros(len(_recipes_df))
     
-    # Get ingredients from rated recipes
+    # Get indices of rated recipes
     rated_recipe_ids = [str(rid) for rid in user_ratings['recipe_id'].tolist()]
-    rated_ingredients = _recipes_df[_recipes_df['id'].astype(str).isin(rated_recipe_ids)]['ingredients'].tolist()
     
-    # Create user profile embedding
-    user_embedding = encode_user_profile(rated_ingredients)
+    # Create a mapping of recipe_id to its row index
+    recipe_id_to_idx = {str(recipe_id): idx for idx, recipe_id in enumerate(_recipes_df['id'])}
+    rated_indices = [recipe_id_to_idx[rid] for rid in rated_recipe_ids if rid in recipe_id_to_idx]
     
-    if user_embedding is None:
+    if not rated_indices:
         return np.zeros(len(_recipes_df))
+        
+    # Mathematical Optimization: The user profile is simply the mean of the embeddings of their rated recipes
+    # This completely bypasses the need to load PyTorch and SentenceTransformers at runtime!
+    rated_embeddings = _embeddings[rated_indices]
+    user_embedding = np.mean(rated_embeddings, axis=0)
     
     # Compute similarity with all recipes
     similarities = compute_similarity(user_embedding, _embeddings)[0]
