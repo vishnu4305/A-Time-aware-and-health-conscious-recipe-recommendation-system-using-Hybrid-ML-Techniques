@@ -26,7 +26,8 @@ const safeFetch = async (endpoint, options) => {
 };
 
 function UserProfile({ onUserCreated }) {
-    const [isLoginMode, setIsLoginMode] = useState(true);
+    const [authMode, setAuthMode] = useState('login'); // 'login', 'register', 'forgot'
+    const [email, setEmail] = useState('');
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState(null);
@@ -69,7 +70,38 @@ function UserProfile({ onUserCreated }) {
                 setError("Incorrect password.");
             } else if (response.status === 404) {
                 setError("User not found. Please complete your details to register.");
-                setIsLoginMode(false); // Automatically switch to the register tab
+                setAuthMode('register'); // Automatically switch to the register tab
+            } else {
+                setError("An error occurred. Please try again.");
+            }
+        } catch (err) {
+            setError("Could not connect to the server.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Handle Password Reset
+    const handleResetSubmit = async (e) => {
+        e.preventDefault();
+        setError(null);
+        setLoading(true);
+
+        try {
+            const response = await safeFetch('/user/reset-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, email, new_password: password }) // reusing password state for new password
+            });
+
+            if (response.ok) {
+                setError(null);
+                alert("Password reset successfully! You can now login with your new password.");
+                setPassword('');
+                setAuthMode('login');
+            } else if (response.status === 401 || response.status === 404) {
+                const data = await response.json();
+                setError(data.error || "Verification failed. Please check your username and email.");
             } else {
                 setError("An error occurred. Please try again.");
             }
@@ -89,6 +121,7 @@ function UserProfile({ onUserCreated }) {
         const userData = { 
             username, 
             password,
+            email,
             name, 
             age: parseInt(age), 
             height: parseFloat(height), 
@@ -129,16 +162,16 @@ function UserProfile({ onUserCreated }) {
                     
                     <Nav variant="tabs" className="mb-4 justify-content-center">
                         <Nav.Item>
-                            <Nav.Link active={isLoginMode} onClick={() => { setIsLoginMode(true); setError(null); }}>Login</Nav.Link>
+                            <Nav.Link active={authMode === 'login'} onClick={() => { setAuthMode('login'); setError(null); }}>Login</Nav.Link>
                         </Nav.Item>
                         <Nav.Item>
-                            <Nav.Link active={!isLoginMode} onClick={() => { setIsLoginMode(false); setError(null); }}>Register</Nav.Link>
+                            <Nav.Link active={authMode === 'register'} onClick={() => { setAuthMode('register'); setError(null); }}>Register</Nav.Link>
                         </Nav.Item>
                     </Nav>
 
                     {error && <Alert variant="danger">{error}</Alert>}
 
-                    {isLoginMode ? (
+                    {authMode === 'login' && (
                         <Form onSubmit={handleLoginSubmit}>
                             <Form.Group className="mb-3">
                                 <Form.Label>Username *</Form.Label>
@@ -153,12 +186,38 @@ function UserProfile({ onUserCreated }) {
                             <Form.Group className="mb-4">
                                 <Form.Label>Password *</Form.Label>
                                 <Form.Control type="password" placeholder="Enter your password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                                <div className="text-end mt-1">
+                                    <a href="#" onClick={(e) => { e.preventDefault(); setAuthMode('forgot'); setError(null); setPassword(''); }} className="text-decoration-none small">Forgot Password?</a>
+                                </div>
                             </Form.Group>
                             <Button variant="primary" type="submit" className="w-100" disabled={loading}>
                                  {loading ? 'Logging in...' : 'Login'}
                             </Button>
                         </Form>
-                    ) : (
+                    )}
+                    
+                    {authMode === 'forgot' && (
+                        <Form onSubmit={handleResetSubmit}>
+                            <h5 className="mb-3 text-center">Reset Password</h5>
+                            <Form.Group className="mb-3">
+                                <Form.Label>Username *</Form.Label>
+                                <Form.Control type="text" placeholder="Enter your username" value={username} onChange={(e) => setUsername(e.target.value)} required />
+                            </Form.Group>
+                            <Form.Group className="mb-3">
+                                <Form.Label>Email Address *</Form.Label>
+                                <Form.Control type="email" placeholder="Enter your registered email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                            </Form.Group>
+                            <Form.Group className="mb-4">
+                                <Form.Label>New Password *</Form.Label>
+                                <Form.Control type="password" placeholder="Enter new password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                            </Form.Group>
+                            <Button variant="warning" type="submit" className="w-100" disabled={loading}>
+                                {loading ? 'Resetting...' : 'Reset Password'}
+                            </Button>
+                        </Form>
+                    )}
+
+                    {authMode === 'register' && (
                         <Form onSubmit={handleRegistrationSubmit}>
                             <Row>
                                 <Col md={6}>
@@ -174,6 +233,10 @@ function UserProfile({ onUserCreated }) {
                                     </Form.Group>
                                 </Col>
                             </Row>
+                            <Form.Group className="mb-3">
+                                <Form.Label>Email Address *</Form.Label>
+                                <Form.Control type="email" placeholder="Enter your email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                            </Form.Group>
                             <Row>
                                 <Col md={6}>
                                     <Form.Group className="mb-3">

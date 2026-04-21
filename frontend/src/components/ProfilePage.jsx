@@ -114,6 +114,7 @@ function ProfilePage({ user, onUserChange, onLogout }) {
       const userId = user.id || user._id;
       const response = await safeAxios('put', `/user/update/${userId}`, {
         name: userDetails.name, // Name remains unchanged
+        email: editForm.email,
         age: parseInt(editForm.age),
         height: parseFloat(editForm.height),
         weight: parseFloat(editForm.weight),
@@ -168,6 +169,10 @@ function ProfilePage({ user, onUserChange, onLogout }) {
               <Row>
                 <Col md={6}>
                   <p className="mb-3"><strong>Name:</strong> {userDetails.name}</p>
+                  <div className="mb-3">
+                    <strong>Email:</strong> 
+                    {isEditing ? <Form.Control type="email" name="email" value={editForm.email || ''} onChange={handleEditChange} size="sm" className="mt-1" required /> : ` ${userDetails.email || 'Not provided'}`}
+                  </div>
                   <div className="mb-3">
                     <strong>Age:</strong> 
                     {isEditing ? <Form.Control type="number" name="age" value={editForm.age || ''} onChange={handleEditChange} size="sm" className="mt-1" /> : ` ${userDetails.age} years`}

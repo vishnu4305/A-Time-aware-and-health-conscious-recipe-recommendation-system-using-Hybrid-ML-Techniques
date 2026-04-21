@@ -75,13 +75,14 @@ def get_user_by_id(user_id):
     return user
 
 
-def create_user(username, name, age, height, weight, gender, conditions, activity_level=1.2, password=None):
+def create_user(username, name, age, height, weight, gender, conditions, activity_level=1.2, password=None, email=None):
     """Create a new user"""
     database = get_db()
     user_id = get_next_sequence_value('userid')
     user = {
         '_id': user_id,
         'username': username,
+        'email': email,
         'password': password,
         'name': name,
         'age': age,
@@ -95,13 +96,14 @@ def create_user(username, name, age, height, weight, gender, conditions, activit
     return user_id
 
 
-def update_user(user_id, name, age, height, weight, gender, conditions, activity_level=1.2):
+def update_user(user_id, name, age, height, weight, gender, conditions, activity_level=1.2, email=None):
     """Update an existing user"""
     database = get_db()
     database.users.update_one(
         {'_id': parse_id(user_id)},
         {'$set': {
             'name': name,
+            'email': email,
             'age': age,
             'height': height,
             'weight': weight,
@@ -109,6 +111,16 @@ def update_user(user_id, name, age, height, weight, gender, conditions, activity
             'activity_level': activity_level,
             'conditions': conditions if conditions else []
         }}
+    )
+    return {'affected_rows': 1}
+
+
+def update_password(user_id, hashed_password):
+    """Update user's password after a reset"""
+    database = get_db()
+    database.users.update_one(
+        {'_id': parse_id(user_id)},
+        {'$set': {'password': hashed_password}}
     )
     return {'affected_rows': 1}
 

@@ -105,6 +105,7 @@ def create_user():
     {
         "username": "vishnu123",
         "password": "secretpassword",
+        "email": "vishnu@example.com",
         "name": "Vishnu",
         "age": 25,
         "height": 169,
@@ -117,6 +118,7 @@ def create_user():
         data = request.json
         username = data.get('username')
         password = data.get('password')
+        email = data.get('email')
         name = data.get('name')
         age = data.get('age')
         height = data.get('height')
@@ -126,8 +128,8 @@ def create_user():
         conditions = data.get('conditions', [])
         
         # Validate required fields
-        if not all([username, password, name, age, height, weight]):
-            return jsonify({'error': 'Missing required fields'}), 400
+        if not all([username, password, email, name, age, height, weight]):
+            return jsonify({'error': 'Missing required fields including email'}), 400
         
         # Check if user already exists
         existing_user = db.get_user_by_username(username)
@@ -138,7 +140,7 @@ def create_user():
         hashed_password = generate_password_hash(password)
 
         # Create new user
-        user_id = db.create_user(username, name, age, height, weight, gender, conditions, activity_level, password=hashed_password)
+        user_id = db.create_user(username, name, age, height, weight, gender, conditions, activity_level, password=hashed_password, email=email)
         
         if user_id:
             user = db.get_user_by_id(user_id)
@@ -196,6 +198,7 @@ def update_user_profile(user_id):
     try:
         data = request.json
         name = data.get('name')
+        email = data.get('email')
         age = data.get('age')
         height = data.get('height')
         weight = data.get('weight')
@@ -203,16 +206,47 @@ def update_user_profile(user_id):
         activity_level = data.get('activity_level', 1.2)
         conditions = data.get('conditions', [])
         
-        if not all([name, age, height, weight]):
-            return jsonify({'error': 'Missing required fields'}), 400
+        if not all([name, email, age, height, weight]):
+            return jsonify({'error': 'Missing required fields including email'}), 400
         
-        db.update_user(user_id, name, age, height, weight, gender, conditions, activity_level)
+        db.update_user(user_id, name, age, height, weight, gender, conditions, activity_level, email=email)
         user = db.get_user_by_id(user_id)
         
         return jsonify({
             'message': 'User updated successfully',
             'user': user
         }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/user/reset-password', methods=['POST'])
+def reset_password():
+    """
+    Reset password via username and email verification
+    """
+    try:
+        data = request.json
+        username = data.get('username')
+        email = data.get('email')
+        new_password = data.get('new_password')
+        
+        if not all([username, email, new_password]):
+            return jsonify({'error': 'Username, email, and new password are required'}), 400
+            
+        user = db.get_user_by_username(username)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+            
+        # Verify email matches what we have in the database
+        if user.get('email') != email:
+            return jsonify({'error': 'Email address does not match our records for this user.'}), 401
+            
+        # Hash and update the new password
+        hashed_password = generate_password_hash(new_password)
+        db.update_password(user.get('_id') or user.get('id'), hashed_password)
+        
+        return jsonify({'message': 'Password reset successfully'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
