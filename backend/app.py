@@ -11,6 +11,7 @@ import os
 import threading
 import sys
 from dotenv import load_dotenv
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # Add ml_models to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -56,18 +57,32 @@ def login_user():
     
     Request JSON:
     {
-        "username": "vishnu123"
+        "username": "vishnu123",
+        "password": "secretpassword"
     }
     """
     try:
         data = request.json
         username = data.get('username')
+        password = data.get('password')
         
-        if not username:
-            return jsonify({'error': 'Username is required'}), 400
+        if not username or not password:
+            return jsonify({'error': 'Username and password are required'}), 400
             
         user = db.get_user_by_username(username)
         if user:
+            stored_password = user.get('password')
+            
+            # Check password if it exists (allows legacy users without passwords to still login)
+            if stored_password:
+                if not check_password_hash(stored_password, password):
+                    return jsonify({'error': 'Invalid username or password.'}), 401
+            else:
+                # Legacy users created before the password update won't have a hash.
+                # In a real production app, you would prompt them to create a password here.
+                if password != "dev_bypass":
+                    print(f"Legacy user '{username}' logged in without a password check.")
+
             user_id = user.get('_id') or user.get('id')
             return jsonify({
                 'message': 'Login successful',
@@ -89,6 +104,7 @@ def create_user():
     Request JSON:
     {
         "username": "vishnu123",
+        "password": "secretpassword",
         "name": "Vishnu",
         "age": 25,
         "height": 169,
@@ -100,6 +116,7 @@ def create_user():
     try:
         data = request.json
         username = data.get('username')
+        password = data.get('password')
         name = data.get('name')
         age = data.get('age')
         height = data.get('height')
@@ -109,7 +126,7 @@ def create_user():
         conditions = data.get('conditions', [])
         
         # Validate required fields
-        if not all([username, name, age, height, weight]):
+        if not all([username, password, name, age, height, weight]):
             return jsonify({'error': 'Missing required fields'}), 400
         
         # Check if user already exists
@@ -117,8 +134,11 @@ def create_user():
         if existing_user:
             return jsonify({'error': 'Username already exists. Please choose another one or login.'}), 409
         
+        # Hash the password securely
+        hashed_password = generate_password_hash(password)
+
         # Create new user
-        user_id = db.create_user(username, name, age, height, weight, gender, conditions, activity_level)
+        user_id = db.create_user(username, name, age, height, weight, gender, conditions, activity_level, password=hashed_password)
         
         if user_id:
             user = db.get_user_by_id(user_id)

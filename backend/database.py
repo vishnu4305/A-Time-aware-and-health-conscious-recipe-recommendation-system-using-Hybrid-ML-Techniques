@@ -75,13 +75,14 @@ def get_user_by_id(user_id):
     return user
 
 
-def create_user(username, name, age, height, weight, gender, conditions, activity_level=1.2):
+def create_user(username, name, age, height, weight, gender, conditions, activity_level=1.2, password=None):
     """Create a new user"""
     database = get_db()
     user_id = get_next_sequence_value('userid')
     user = {
         '_id': user_id,
         'username': username,
+        'password': password,
         'name': name,
         'age': age,
         'height': height,

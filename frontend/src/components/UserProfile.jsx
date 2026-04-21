@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, Form, Button, Alert, Row, Col, Container } from 'react-bootstrap';
+import { Card, Form, Button, Alert, Row, Col, Container, Nav } from 'react-bootstrap';
 
 const RENDER_URL = process.env.REACT_APP_API_URL || 'https://recipe-recommender-api-57hq.onrender.com';
 const LOCAL_URL = 'http://localhost:5000';
@@ -26,8 +26,9 @@ const safeFetch = async (endpoint, options) => {
 };
 
 function UserProfile({ onUserCreated }) {
+    const [isLoginMode, setIsLoginMode] = useState(true);
     const [username, setUsername] = useState('');
-    const [isNewUser, setIsNewUser] = useState(false);
+    const [password, setPassword] = useState('');
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(false);
 
@@ -48,8 +49,8 @@ function UserProfile({ onUserCreated }) {
         );
     };
 
-    // Step 1: Handle checking the username
-    const handleUsernameSubmit = async (e) => {
+    // Step 1: Handle Login
+    const handleLoginSubmit = async (e) => {
         e.preventDefault();
         setError(null);
         setLoading(true);
@@ -58,15 +59,17 @@ function UserProfile({ onUserCreated }) {
             const response = await safeFetch('/user/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username })
+                body: JSON.stringify({ username, password })
             });
 
             if (response.ok) {
                 const data = await response.json();
-                onUserCreated(data.user); // This tells App.js the user is logged in
+                onUserCreated(data.user);
+            } else if (response.status === 401) {
+                setError("Incorrect password.");
             } else if (response.status === 404) {
-                // User not found, show the rest of the form
-                setIsNewUser(true);
+                setError("User not found. Please complete your details to register.");
+                setIsLoginMode(false); // Automatically switch to the register tab
             } else {
                 setError("An error occurred. Please try again.");
             }
@@ -85,6 +88,7 @@ function UserProfile({ onUserCreated }) {
 
         const userData = { 
             username, 
+            password,
             name, 
             age: parseInt(age), 
             height: parseFloat(height), 
@@ -122,25 +126,36 @@ function UserProfile({ onUserCreated }) {
                 <Card.Body>
                     <h4 className="text-center mb-2">👤 User Profile</h4>
                     <p className="text-muted text-center mb-4">Enter your details to get personalized recipe recommendations</p>
+                    
+                    <Nav variant="tabs" className="mb-4 justify-content-center">
+                        <Nav.Item>
+                            <Nav.Link active={isLoginMode} onClick={() => { setIsLoginMode(true); setError(null); }}>Login</Nav.Link>
+                        </Nav.Item>
+                        <Nav.Item>
+                            <Nav.Link active={!isLoginMode} onClick={() => { setIsLoginMode(false); setError(null); }}>Register</Nav.Link>
+                        </Nav.Item>
+                    </Nav>
+
                     {error && <Alert variant="danger">{error}</Alert>}
 
-                    {!isNewUser ? (
-                        <Form onSubmit={handleUsernameSubmit}>
+                    {isLoginMode ? (
+                        <Form onSubmit={handleLoginSubmit}>
                             <Form.Group className="mb-3">
                                 <Form.Label>Username *</Form.Label>
                                 <Form.Control 
                                     type="text" 
-                                    placeholder="Choose a unique username" 
+                                    placeholder="Enter your username" 
                                     value={username} 
                                     onChange={(e) => setUsername(e.target.value)} 
                                     required 
                                 />
-                                <Form.Text className="text-muted">
-                                    If you've used this app before, enter your previous username to load your profile
-                                </Form.Text>
+                            </Form.Group>
+                            <Form.Group className="mb-4">
+                                <Form.Label>Password *</Form.Label>
+                                <Form.Control type="password" placeholder="Enter your password" value={password} onChange={(e) => setPassword(e.target.value)} required />
                             </Form.Group>
                             <Button variant="primary" type="submit" className="w-100" disabled={loading}>
-                                 {loading ? 'Checking...' : 'Continue'}
+                                 {loading ? 'Logging in...' : 'Login'}
                             </Button>
                         </Form>
                     ) : (
@@ -149,23 +164,31 @@ function UserProfile({ onUserCreated }) {
                                 <Col md={6}>
                                     <Form.Group className="mb-3">
                                         <Form.Label>Username *</Form.Label>
-                                        <Form.Control type="text" value={username} disabled />
+                                        <Form.Control type="text" placeholder="Choose a username" value={username} onChange={(e) => setUsername(e.target.value)} required />
                                     </Form.Group>
                                 </Col>
                                 <Col md={6}>
                                     <Form.Group className="mb-3">
-                                        <Form.Label>Name *</Form.Label>
-                                        <Form.Control type="text" placeholder="Enter your full name" value={name} onChange={(e) => setName(e.target.value)} required />
+                                        <Form.Label>Password *</Form.Label>
+                                        <Form.Control type="password" placeholder="Create a password" value={password} onChange={(e) => setPassword(e.target.value)} required />
                                     </Form.Group>
                                 </Col>
                             </Row>
                             <Row>
                                 <Col md={6}>
                                     <Form.Group className="mb-3">
+                                        <Form.Label>Name *</Form.Label>
+                                        <Form.Control type="text" placeholder="Enter your full name" value={name} onChange={(e) => setName(e.target.value)} required />
+                                    </Form.Group>
+                                </Col>
+                                <Col md={6}>
+                                    <Form.Group className="mb-3">
                                         <Form.Label>Age *</Form.Label>
                                         <Form.Control type="number" placeholder="Age" value={age} onChange={(e) => setAge(e.target.value)} required />
                                     </Form.Group>
                                 </Col>
+                            </Row>
+                            <Row>
                                 <Col md={6}>
                                     <Form.Group className="mb-3">
                                         <Form.Label>Gender</Form.Label>

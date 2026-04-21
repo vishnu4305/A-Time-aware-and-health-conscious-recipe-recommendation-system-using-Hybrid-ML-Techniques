@@ -23,7 +23,7 @@ const safeAxios = async (method, endpoint, payload = null) => {
   }
 };
 
-function ProfilePage({ user, onUserChange }) {
+function ProfilePage({ user, onUserChange, onLogout }) {
   const [userDetails, setUserDetails] = useState(user); // Start with user prop data
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -260,6 +260,11 @@ function ProfilePage({ user, onUserChange }) {
                   Edit Profile
                 </Button>
               )}
+              
+              <hr className="my-3" />
+              <Button variant="danger" onClick={() => { if(onLogout) onLogout(); else window.location.reload(); }} className="w-100">
+                Logout
+              </Button>
             </Card.Body>
           </Card>
         </Col>
